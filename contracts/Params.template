@@ -1,0 +1,100 @@
+pragma solidity >=0.6.0 <0.8.0;
+
+contract Params {
+    bool public initialized ;
+
+    {% if mock %}
+    address public ValidatorContractAddr;
+    address public PunishContractAddr;
+    address public ProposalAddr;
+    address public PROPOSAL_ADDR;
+    address public HsctTokenAddr;
+
+    // only for test
+    address public miner;
+
+    {% else %}
+    // System contracts
+    address
+        public constant ValidatorContractAddr = 0x000000000000000000000000000000000000f000;
+    address
+        public constant PunishContractAddr = 0x000000000000000000000000000000000000F001;
+    address
+        public constant ProposalAddr = 0x000000000000000000000000000000000000F002;
+    address
+        public constant HsctTokenAddr = 0x000000000000000000000000000000000000F003;
+
+    {% endif %}
+    // System params
+    uint16 constant public MaxValidators = 21;
+    // Validator have to wait StakingLockPeriod blocks to withdraw staking
+    uint64 constant public StakingLockPeriod = 100;
+    // Validator have to wait RestakingLockPeriod blocks to restaking if jailed
+    uint64 constant public RestakingLockPeriodJailed = 300;
+    // Validator have to wait RestakingLockPeriod blocks to restaking if unstaked
+    uint64 constant public RestakingLockPeriodUnstaked = 200;
+    // Validator have to wait WithdrawProfitPeriod blocks to withdraw his profits
+    uint64 constant public WithdrawProfitPeriod = 100;
+    uint256 constant public MinimalStakingCoin = 32 ether;
+
+    {% if mock %}
+    modifier onlyMiner() {
+        require(
+            // just for test
+            msg.sender == miner,
+            "Miner only"
+        );
+        _;
+    }
+
+    {% else %}
+    modifier onlyMiner() {
+        require(
+            msg.sender == block.coinbase,
+            "Miner only"
+        );
+        _;
+    }
+
+    {% endif %}
+    modifier onlyNotInitialized() {
+        require(!initialized, "Already initialized");
+        _;
+    }
+
+    modifier onlyInitialized() {
+        require(initialized, "Not init yet");
+        _;
+    }
+
+    modifier onlyPunishContract() {
+        require(msg.sender == PunishContractAddr, "Punish contract only");
+        _;
+    }
+
+    modifier onlyBlockEpoch(uint256 epoch) {
+        require(block.number % epoch == 0, "Block epoch only");
+        _;
+    }
+
+    modifier onlyValidatorsContract() {
+        require(
+            msg.sender == ValidatorContractAddr,
+            "Validators contract only"
+        );
+        _;
+    }
+
+    {% if mock %}
+    function setContracts(address val, address punish, address proposal, address hsct) public {
+        ValidatorContractAddr = val;
+        PunishContractAddr = punish;
+        ProposalAddr = proposal;
+        HsctTokenAddr = hsct;
+    }
+
+    function setMiner(address miner_) public {
+        miner = miner_;
+    }
+    {% endif %}
+}
