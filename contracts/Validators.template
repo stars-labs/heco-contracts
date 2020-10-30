@@ -78,7 +78,6 @@ contract Validators is Params {
     );
     event LogAddToTopValidators(address indexed val, uint256 time);
     event LogRemoveFromTopValidators(address indexed val, uint256 time);
-    event LogRestake(address indexed val, uint256 staking, uint256 time);
     event LogUnstake(address indexed val, uint256 time);
     event LogWithdrawStaking(address indexed val, uint256 amount, uint256 time);
     event LogWithdrawProfits(
@@ -106,8 +105,9 @@ contract Validators is Params {
         uint256 time
     );
     event LogUpdateValidator(address[] newSet);
-    event LogAddStake(address indexed val, uint256 addAmount);
-    event LogChangeDec(uint256 newMulti, uint256 newDivisor);
+    event LogAddStake(address indexed val, uint256 addAmount, uint256 time);
+    event LogRestake(address indexed val, uint256 restake, uint256 time);
+    event LogChangeDec(uint256 newMulti, uint256 newDivisor, uint256 time);
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Admin only");
@@ -147,7 +147,7 @@ contract Validators is Params {
         dec.multi = multi_;
         dec.divisor = divisor_;
 
-        emit LogChangeDec(multi_, divisor_);
+        emit LogChangeDec(multi_, divisor_, block.timestamp);
     }
 
     // first time stake or add stake
@@ -199,6 +199,20 @@ contract Validators is Params {
             return true;
         }
 
+        // restake if you are unstaked
+        // just update stake coin info
+        if (validatorInfo[validator].status == Status.Unstaked) {
+            require(staking >= MinimalStakingCoin, "Staking coins not enough");
+            require(punish.cleanPunishRecord(validator), "clean failed");
+
+            validatorInfo[validator].coins = staking;
+            validatorInfo[validator].status = Status.Staked;
+            tryAddValidatorToHighestSet(validator, staking);
+
+            emit LogRestake(validator, staking, block.timestamp);
+            return true;
+        }
+
         // add stake
         require(
             validatorInfo[validator].status == Status.Staked,
@@ -209,7 +223,7 @@ contract Validators is Params {
         );
         tryAddValidatorToHighestSet(validator, validatorInfo[validator].coins);
 
-        emit LogAddStake(msg.sender, msg.value);
+        emit LogAddStake(msg.sender, msg.value, block.timestamp);
     }
 
     function editValidator(
@@ -243,47 +257,6 @@ contract Validators is Params {
         return true;
     }
 
-    function restake() external payable onlyInitialized returns (bool) {
-        address validator = msg.sender;
-        // validatorInfo[validator].coins > 0 when validator is jailed and not
-        // withdraw his staking.
-        uint256 staking = msg.value.add(validatorInfo[validator].coins);
-        require(
-            validatorInfo[validator].status == Status.Jailed ||
-                validatorInfo[validator].status == Status.Unstaked,
-            "Invalid status, can't restake"
-        );
-        if (validatorInfo[validator].status == Status.Unstaked) {
-            require(
-                block.number >=
-                    RestakingLockPeriodUnstaked +
-                        validatorInfo[validator].removedBlock,
-                "You haven't wait enough blocks to restake(unstaked)"
-            );
-        }
-        if (validatorInfo[validator].status == Status.Jailed) {
-            require(
-                block.number >=
-                    RestakingLockPeriodJailed +
-                        validatorInfo[validator].removedBlock,
-                "You haven't wait enough blocks to restake(jailed)"
-            );
-        }
-        require(staking >= MinimalStakingCoin, "Staking coins not enough");
-
-        validatorInfo[validator].status = Status.Staked;
-        validatorInfo[validator].coins = staking;
-
-        tryAddValidatorToHighestSet(validator, staking);
-
-        // try to clean punish record
-        require(punish.cleanPunishRecord(validator), "clean failed");
-
-        emit LogRestake(validator, staking, block.timestamp);
-
-        return true;
-    }
-
     function unstake() external onlyInitialized returns (bool) {
         address validator = msg.sender;
         require(
@@ -291,6 +264,8 @@ contract Validators is Params {
             "Invalid status, can't unstake"
         );
         // If you are the only one top validator, then you can't unstake
+        // You can unstake if you are not top validator.
+        // Or top validators length > 1.
         require(
             highestValidatorsSet.length > 1 || !isTopValidator(validator),
             "You are the only one validator, can't unstake!"
@@ -302,12 +277,16 @@ contract Validators is Params {
         // try to remove it out of active validator set if exist.
         tryRemoveValidatorInHighestSet(validator);
 
+        // call proposal contract to set unpass.
+        // you have to repropose to be a validator.
+        proposal.setUnpassed(validator);
         emit LogUnstake(validator, block.timestamp);
         return true;
     }
 
     function withdrawStaking() external returns (bool) {
-        address validator = msg.sender;
+        address payable validator = payable(msg.sender);
+        // unstaking or jailed.
         require(
             validatorInfo[validator].status != Status.NotExist &&
                 validatorInfo[validator].status != Status.Staked,
@@ -323,12 +302,11 @@ contract Validators is Params {
 
         uint256 staking = validatorInfo[validator].coins;
         validatorInfo[validator].coins = 0;
-        // do nothing if validator is jailed
-        if (validatorInfo[validator].status == Status.Unstaking) {
-            validatorInfo[validator].status = Status.Unstaked;
-        }
-
-        validatorInfo[validator].feeAddr.transfer(staking);
+        // set status to unstaked no matter you are jailed/unstaking.
+        // you can stake if you repass proposal.
+        validatorInfo[validator].status = Status.Unstaked;
+        // send stake back to origin validator.
+        safeTransferHB(validator, staking);
 
         emit LogWithdrawStaking(validator, staking, block.timestamp);
 
@@ -375,6 +353,8 @@ contract Validators is Params {
             hbIncoming,
             hsctIncoming
         );
+
+        return true;
     }
 
     // depositBlockReward block reward and gas fee to coin base
@@ -441,6 +421,10 @@ contract Validators is Params {
         // Note: the jailed validator may in active set if there is only one validator exist
         if (highestValidatorsSet.length > 1) {
             tryJailValidator(val);
+
+            // call proposal contract to set unpass.
+            // you have to repropose to be a validator.
+            proposal.setUnpassed(val);
         }
 
         emit LogRemoveValidator(val, hb, hsct, block.timestamp);
@@ -676,8 +660,8 @@ contract Validators is Params {
     }
 
     function safeTransferHSCT(address to, uint256 amount) internal {
-        if (amount > hsctToken.balanceOf(to)) {
-            amount = hsctToken.balanceOf(to);
+        if (amount > hsctToken.balanceOf(address(this))) {
+            amount = hsctToken.balanceOf(address(this));
         }
 
         hsctToken.transfer(to, amount);

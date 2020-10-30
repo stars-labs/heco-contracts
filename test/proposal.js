@@ -23,15 +23,16 @@ contract("Proposal test", function (accounts) {
         vals.push(accounts[i]);
     }
     var proposalIns;
+    var mockVal;
 
     before(async function () {
-        let mockVal = await MockValidators.new(vals);
+        proposalIns = await Proposal.new();
+        mockVal = await MockValidators.new(vals, proposalIns.address);
         for (let i = 0; i < vals.length; i++) {
             let exist = await mockVal.isActiveValidator(vals[i]);
             assert.equal(exist, true, "initialize validator failed");
         }
 
-        proposalIns = await Proposal.new();
         await proposalIns.setContracts(mockVal.address, constants.ZERO_ADDRESS, constants.ZERO_ADDRESS, constants.ZERO_ADDRESS,);
         await proposalIns.initialize([]);
     });
@@ -138,6 +139,26 @@ contract("Proposal test", function (accounts) {
                     expectEvent(receipt, 'LogRejectProposal', { id: id, dst: candidate });
                 }
             }
+        })
+    })
+
+    describe("Set val unpass", async function () {
+        let candidate = accounts[6];
+
+        it("only validator can set val unpass", async function () {
+            await expectRevert(
+                proposalIns.setUnpassed(candidate),
+                "Validators contract only"
+            )
+        })
+        it("validator contract can set val unpass", async function () {
+            let before = await proposalIns.pass(candidate);
+            assert.equal(before, true);
+
+            await mockVal.setUnpassed(candidate);
+
+            let after = await proposalIns.pass(candidate);
+            assert.equal(after, false);
         })
     })
 });

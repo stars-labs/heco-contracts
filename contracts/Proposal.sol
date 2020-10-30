@@ -63,6 +63,7 @@ contract Proposal is Params {
         address indexed dst,
         uint256 time
     );
+    event LogSetUnpassed(address indexed val, uint256 time);
 
     modifier onlyValidator() {
         require(validators.isActiveValidator(msg.sender), "Validator only");
@@ -156,6 +157,18 @@ contract Proposal is Params {
             emit LogRejectProposal(id, proposals[id].dst, block.timestamp);
         }
 
+        return true;
+    }
+
+    function setUnpassed(address val)
+        external
+        onlyValidatorsContract
+        returns (bool)
+    {
+        // set validator unpass
+        pass[val] = false;
+
+        emit LogSetUnpassed(val, block.timestamp);
         return true;
     }
 }

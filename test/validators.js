@@ -44,10 +44,6 @@ contract("Validators test", function (accounts) {
         console.log("maxValidators", maxValidators.toString());
         let stakingLockPeriod = await valIns.StakingLockPeriod();
         console.log("stakingLockPeriod", stakingLockPeriod.toString());
-        let RestakingLockPeriodJailed = await valIns.RestakingLockPeriodJailed();
-        console.log("RestakingLockPeriodJailed", RestakingLockPeriodJailed.toString());
-        let RestakingLockPeriodUnstaked = await valIns.RestakingLockPeriodUnstaked();
-        console.log("RestakingLockPeriodUnstaked", RestakingLockPeriodUnstaked.toString());
         let WithdrawProfitPeriod = await valIns.WithdrawProfitPeriod();
         console.log("WithdrawProfitPeriod", WithdrawProfitPeriod.toString());
         let MinimalStakingCoin = await valIns.MinimalStakingCoin();
@@ -134,6 +130,24 @@ contract("Validators test", function (accounts) {
             let is = await valIns.isTopValidator(account);
             assert.equal(is, true);
         })
+
+        it("withdraw stake will transfer stake back to original validator", async function () {
+            let val = accounts[41];
+            let fee = accounts[42];
+            let stake = ether('100');
+            await pass(proposalIns, initValidators, val);
+            await valIns.stake(fee, "", "", "", "", "", { from: val, value: stake });
+
+            await valIns.unstake({ from: val });
+
+            let lock = await valIns.StakingLockPeriod();
+            for (let i = 0; i < lock.toNumber(); i++) {
+                await time.advanceBlock();
+            }
+
+            let receipt = await valIns.withdrawStaking({ from: val });
+            expectEvent(receipt, "LogWithdrawStaking", { val: val, amount: stake });
+        })
     })
 
     describe("Edit validator", async function () {
@@ -203,41 +217,44 @@ contract("Validators test", function (accounts) {
         })
     })
 
-    describe("restake", async function () {
-        it("can't restake if not wait enough block after unstake", async function () {
-            let account = accounts[1];
+    describe("repropose to be a validator if removed", async function () {
+        let unstakedAccount = accounts[1];
+
+        it("can't stake if removed without withdraw stake or repass proposal", async function () {
             let stake = web3.utils.toWei("100");
-            await expectRevert(valIns.restake({ from: account, value: stake }), "You haven't wait enough blocks to restake(unstaked)");
+
+            await expectRevert(valIns.stake(unstakedAccount, "", "", "", "", "", { from: unstakedAccount, value: stake }), "You must be authorized first");
         })
 
-        it("can't restake if stake < min stake", async function () {
-            let account = accounts[1];
+        it("unstaked val can repropose", async function () {
+            await pass(proposalIns, initValidators, unstakedAccount);
+        })
+
+        it("can't stake if stake < min stake", async function () {
             let stake = web3.utils.toWei("1");
 
-            // increase block
-            let blocks = await valIns.RestakingLockPeriodUnstaked();
-            for (let i = 0; i < blocks; i++) {
-                await time.advanceBlock();
-            }
-
-            await expectRevert(valIns.restake({ from: account, value: stake }), "Staking coins not enough");
+            await expectRevert(valIns.stake(unstakedAccount, "", "", "", "", "", { from: unstakedAccount, value: stake }), "Staking coins not enough");
         })
 
-        it("can restake if pass", async function () {
-            let account = accounts[1];
+        it("can stake if pass proposal and stake amount >= minimal", async function () {
             let stake = web3.utils.toWei("1000");
 
             // check status
-            let info = await valIns.getValidatorInfo(account);
+            let info = await valIns.getValidatorInfo(unstakedAccount);
             assert.equal(info[1].eq(Unstaked), true);
 
-            let receipt = await valIns.restake({ from: account, value: stake });
-            expectEvent(receipt, "LogRestake", { val: account, staking: stake });
+            let receipt = await valIns.stake(unstakedAccount, "", "", "", "", "", { from: unstakedAccount, value: stake });
+            expectEvent(receipt, "LogRestake", { val: unstakedAccount, restake: stake });
 
-            info = await valIns.getValidatorInfo(account);
+            info = await valIns.getValidatorInfo(unstakedAccount);
             assert.equal(info[1].eq(Staked), true);
 
-            await valIns.isTopValidator(account);
+            await valIns.isTopValidator(unstakedAccount);
+        })
+
+        it("you can unstake", async function () {
+            let receipt = await valIns.unstake({ from: unstakedAccount });
+            expectEvent(receipt, "LogUnstake", { val: unstakedAccount })
         })
     })
 
@@ -257,7 +274,21 @@ contract("Validators test", function (accounts) {
         it("validator can withdraw profits", async function () {
             let receipt = await valIns.withdrawProfits(miner, { from: miner });
 
-            expectEvent(receipt, "LogWithdrawProfits", { val: miner, fee: miner, hb: fee, hsct: fee })
+            expectEvent(receipt, "LogWithdrawProfits", { val: miner, fee: miner, hb: fee, hsct: fee });
+
+            fee = ether('0.5');
+            feeAddr = accounts[10];
+            await valIns.editValidator(feeAddr, "", "", "", "", "", { from: miner });
+            await valIns.depositBlockReward({ from: miner, value: fee });
+
+            // advance block
+            let lock = await valIns.WithdrawProfitPeriod();
+            for (let i = 0; i < lock.toNumber(); i++) {
+                await time.advanceBlock();
+            }
+
+            receipt = await valIns.withdrawProfits(miner, { from: feeAddr });
+            expectEvent(receipt, "LogWithdrawProfits", { val: miner, fee: feeAddr, hb: fee, hsct: fee });
         })
     })
 
@@ -376,7 +407,7 @@ contract("Punish", function (accounts) {
             assert.equal(info[7].toString(), RewardBN.mul(multi).toString());
         })
 
-        it("validator miss record will decrease if necessary", async function () {
+        it("validator missed record will decrease if necessary", async function () {
             let removeThreshold = await punishIns.removeThreshold();
             let decreaseRate = await punishIns.decreaseRate();
             let step = 2;
@@ -411,29 +442,55 @@ contract("Punish", function (accounts) {
             assert.equal(acutal_1.toNumber(), step);
         })
 
-        it("jailed validator restake will clean record", async function () {
+        it("jailed validator can't stake if not withdraw staking or not repass proposal", async function () {
             let jailed = initValidators[0];
             let record = await punishIns.getPunishRecord(jailed);
             assert.equal(record.isZero(), false);
 
             let info = await valIns.getValidatorInfo(jailed);
             assert.equal(info[3].isZero(), false);
-            let unlockBlock = await valIns.RestakingLockPeriodJailed();
-            let dstBlock = unlockBlock.add(info[3]).toNumber();
-            let currentNumber = await web3.eth.getBlockNumber();
-            if (dstBlock > currentNumber) {
-                for (let i = 0; i < dstBlock - currentNumber + 2; i++) {
-                    await time.advanceBlock()
-                }
+
+            // not repass proposal
+            await expectRevert(
+                valIns.stake(jailed, "", "", "", "", "", { from: jailed, value: ether("32") }),
+                "You must be authorized first"
+            )
+
+            await pass(proposalIns, initValidators, jailed);
+            await expectRevert(
+                valIns.stake(jailed, "", "", "", "", "", { from: jailed, value: ether("32") }),
+                "You can only add stake when staked"
+            )
+
+            // step block number to pass staking lock
+            let blocks = await valIns.StakingLockPeriod();
+            for (let i = 0; i < blocks.toNumber(); i++) {
+                await time.advanceBlock();
             }
+            await valIns.withdrawStaking({ from: jailed });
 
-            // now you can restake
+            // stake amount not enough
+            await expectRevert(
+                valIns.stake(jailed, "", "", "", "", "", { from: jailed, value: ether("31") }),
+                "Staking coins not enough"
+            )
+        })
+
+        it("jailed validator stake will clean record", async function () {
+            let jailed = initValidators[0];
+            let record = await punishIns.getPunishRecord(jailed);
+            assert.equal(record.isZero(), false);
+
+            // now you can stake
+            let info = await valIns.getValidatorInfo(jailed);
             let beforeStake = info[2];
-            await valIns.restake({ from: jailed, value: web3.utils.toWei("100") });
+            assert.equal(beforeStake.isZero(), true);
+            let receipt = await valIns.stake(jailed, "", "", "", "", "", { from: jailed, value: ether('100') });
+            expectEvent(receipt, "LogRestake", { val: jailed, restake: ether('100') });
 
-            // restake should right updated
+            // stake should right updated
             info = await valIns.getValidatorInfo(jailed);
-            assert.equal(beforeStake.add(ether('100')).eq(info[2]), true);
+            assert.equal(ether('100').eq(info[2]), true);
 
             // record is cleared
             record = await punishIns.getPunishRecord(jailed);

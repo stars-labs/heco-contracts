@@ -29,10 +29,6 @@ contract Params {
     uint16 constant public MaxValidators = 21;
     // Validator have to wait StakingLockPeriod blocks to withdraw staking
     uint64 constant public StakingLockPeriod = 100;
-    // Validator have to wait RestakingLockPeriod blocks to restaking if jailed
-    uint64 constant public RestakingLockPeriodJailed = 300;
-    // Validator have to wait RestakingLockPeriod blocks to restaking if unstaked
-    uint64 constant public RestakingLockPeriodUnstaked = 200;
     // Validator have to wait WithdrawProfitPeriod blocks to withdraw his profits
     uint64 constant public WithdrawProfitPeriod = 100;
     uint256 constant public MinimalStakingCoin = 32 ether;

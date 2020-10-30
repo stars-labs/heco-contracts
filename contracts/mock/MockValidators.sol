@@ -1,12 +1,18 @@
 pragma solidity >=0.6.0 <0.8.0;
 
+import "../Proposal.sol";
+
 contract MockValidators {
     address[] vals;
 
-    constructor(address[] memory vals_) public {
+    Proposal proposal;
+
+    constructor(address[] memory vals_, address proposal_) public {
         for (uint256 i = 0; i < vals_.length; i++) {
             vals.push(vals_[i]);
         }
+
+        proposal = Proposal(proposal_);
     }
 
     function getActiveValidators() public view returns (address[] memory) {
@@ -26,5 +32,9 @@ contract MockValidators {
         }
 
         return false;
+    }
+
+    function setUnpassed(address who) public {
+        proposal.setUnpassed(who);
     }
 }

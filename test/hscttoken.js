@@ -2,6 +2,7 @@ const Validators = artifacts.require('Validators');
 const HSCTToken = artifacts.require("HSCTToken");
 
 const { ether, constants, BN } = require('@openzeppelin/test-helpers');
+const expectRevert = require('@openzeppelin/test-helpers/src/expectRevert');
 
 let premintAmount = ether("25000000");
 let limit = ether("100000000");
@@ -56,5 +57,9 @@ contract("hsct token", function (accounts) {
         await valIns.depositBlockReward({ from: miner, value: amount });
         let after = await hsctIns.balanceOf(valIns.address);
         assert.equal(before.eq(after), true);
+    })
+
+    it("can't send hb to hsct token", async function () {
+        await expectRevert.unspecified(web3.eth.sendTransaction({ from: accounts[0], to: hsctIns.address, value: ether('1') }));
     })
 })
