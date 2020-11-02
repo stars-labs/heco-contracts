@@ -60,6 +60,9 @@ contract Validators is Params {
     // admin
     address public admin;
 
+    // Record the block is rewarded or not.
+    mapping(uint256 => bool) blockRewarded;
+
     // System contracts
     Proposal proposal;
     HSCTToken hsctToken;
@@ -111,6 +114,14 @@ contract Validators is Params {
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Admin only");
+        _;
+    }
+
+    modifier onlyNotReward() {
+        require(
+            blockRewarded[block.number] == false,
+            "Block is already rewarded"
+        );
         _;
     }
 
@@ -361,7 +372,14 @@ contract Validators is Params {
     }
 
     // depositBlockReward block reward and gas fee to coin base
-    function depositBlockReward() external payable onlyMiner onlyInitialized {
+    function depositBlockReward()
+        external
+        payable
+        onlyMiner
+        onlyNotReward
+        onlyInitialized
+    {
+        blockRewarded[block.number] = true;
         address val = msg.sender;
         uint256 hsct = msg.value;
 
