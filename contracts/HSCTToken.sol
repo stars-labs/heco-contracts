@@ -479,6 +479,7 @@ contract HSCTToken is ERC20, Params {
         require(premint != address(0), "Invalid premint address");
 
         _mint(premint, 25000000 * 10**18);
+        initialized = true;
     }
 
     function mint(address to, uint256 amount)

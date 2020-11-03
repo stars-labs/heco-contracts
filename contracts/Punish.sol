@@ -19,12 +19,18 @@ contract Punish is Params {
     mapping(uint256 => bool) punished;
     address[] public punishValidators;
     Validators validators;
+    mapping(uint256 => bool) decreased;
 
     event LogDecreaseMissedBlocksCounter();
     event LogPunishValidator(address indexed val, uint256 time);
 
     modifier notPunish() {
         require(!punished[block.number], "Already punished");
+        _;
+    }
+
+    modifier notDecreased() {
+        require(!decreased[block.number], "Already decreased");
         _;
     }
 
@@ -64,7 +70,7 @@ contract Punish is Params {
         } else if (
             punishRecords[val].missedBlocksCounter % punishThreshold == 0
         ) {
-            validators.punishValidator(val);
+            validators.removeValidatorIncoming(val);
         }
 
         emit LogPunishValidator(val, block.timestamp);
@@ -73,9 +79,11 @@ contract Punish is Params {
     function decreaseMissedBlocksCounter(uint256 epoch)
         external
         onlyMiner
+        notDecreased
         onlyInitialized
         onlyBlockEpoch(epoch)
     {
+        decreased[block.number] = true;
         if (punishValidators.length == 0) {
             return;
         }

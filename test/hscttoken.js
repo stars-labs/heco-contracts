@@ -26,6 +26,10 @@ contract("hsct token", function (accounts) {
         await valIns.setMiner(miner);
     })
 
+    it("can't initialize twice", async function () {
+        await expectRevert(hsctIns.initialize(premint), "Already initialized");
+    })
+
     it("premint address will get 25000000 hsct token when init", async function () {
         let actual = await hsctIns.balanceOf(premint);
 

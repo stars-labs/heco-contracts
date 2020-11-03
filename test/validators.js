@@ -198,7 +198,7 @@ contract("Validators test", function (accounts) {
 
         it("can't withdraw staking back if locked", async function () {
             let account = accounts[1];
-            await expectRevert(valIns.withdrawStaking({ from: account }), "Your staking haven't lock yet");
+            await expectRevert(valIns.withdrawStaking({ from: account }), "Your staking haven't unlocked yet");
         })
 
         it("can withdraw staking back if unlocked", async function () {

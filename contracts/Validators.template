@@ -60,13 +60,14 @@ contract Validators is Params {
     // admin
     address public admin;
 
-    // Record the block is rewarded or not.
-    mapping(uint256 => bool) blockRewarded;
-
     // System contracts
     Proposal proposal;
     HSCTToken hsctToken;
     Punish punish;
+
+    enum Operations {Deposit, UpdateValidators}
+    // Record the operations is done or not.
+    mapping(uint256 => mapping(uint8 => bool)) operationsDone;
 
     event LogCreateValidator(
         address indexed val,
@@ -87,7 +88,8 @@ contract Validators is Params {
         address indexed val,
         address indexed fee,
         uint256 hb,
-        uint256 hsct
+        uint256 hsct,
+        uint256 time
     );
     event LogRemoveValidator(
         address indexed val,
@@ -95,7 +97,7 @@ contract Validators is Params {
         uint256 hsct,
         uint256 time
     );
-    event LogPunishValidator(
+    event LogRemoveValidatorIncoming(
         address indexed val,
         uint256 hb,
         uint256 hsct,
@@ -119,8 +121,16 @@ contract Validators is Params {
 
     modifier onlyNotReward() {
         require(
-            blockRewarded[block.number] == false,
+            operationsDone[block.number][uint8(Operations.Deposit)] == false,
             "Block is already rewarded"
+        );
+        _;
+    }
+
+    modifier onlyNotUpdate() {
+        require(
+            operationsDone[block.number][uint8(Operations.UpdateValidators)] == false,
+            "Validators already updated"
         );
         _;
     }
@@ -137,13 +147,22 @@ contract Validators is Params {
         for (uint256 i = 0; i < vals.length; i++) {
             require(vals[i] != address(0), "Invalid validator address");
             
-            currentValidatorSet.push(vals[i]);
-            highestValidatorsSet.push(vals[i]);
-
-            validatorInfo[vals[i]].valAddr = payable(vals[i]);
-            validatorInfo[vals[i]].feeAddr = payable(vals[i]);
+            if (!isActiveValidator(vals[i])) {
+                currentValidatorSet.push(vals[i]);
+            }
+            if (!isTopValidator(vals[i])) {
+                highestValidatorsSet.push(vals[i]);
+            }
+            if (validatorInfo[vals[i]].valAddr == address(0)) {
+                validatorInfo[vals[i]].valAddr = payable(vals[i]);
+            }
+            if (validatorInfo[vals[i]].feeAddr == address(0)) {
+                validatorInfo[vals[i]].feeAddr = payable(vals[i]);
+            }
             // Important: NotExist validator can't get profits
-            validatorInfo[vals[i]].status = Status.Staked;
+            if (validatorInfo[vals[i]].status == Status.NotExist) {
+                validatorInfo[vals[i]].status = Status.Staked;
+            }
         }
 
         initialized  = true;
@@ -308,7 +327,7 @@ contract Validators is Params {
         require(
             validatorInfo[validator].removedBlock + StakingLockPeriod <=
                 block.number,
-            "Your staking haven't lock yet"
+            "Your staking haven't unlocked yet"
         );
 
         uint256 staking = validatorInfo[validator].coins;
@@ -362,7 +381,8 @@ contract Validators is Params {
             validator,
             msg.sender,
             hbIncoming,
-            hsctIncoming
+            hsctIncoming,
+            block.timestamp
         );
 
         return true;
@@ -376,7 +396,7 @@ contract Validators is Params {
         onlyNotReward
         onlyInitialized
     {
-        blockRewarded[block.number] = true;
+        operationsDone[block.number][uint8(Operations.Deposit)] = true;
         address val = msg.sender;
         uint256 hsct = msg.value;
 
@@ -406,9 +426,11 @@ contract Validators is Params {
     function updateActiveValidatorSet(address[] memory newSet, uint256 epoch)
         public
         onlyMiner
+        onlyNotUpdate
         onlyInitialized
         onlyBlockEpoch(epoch)
     {
+        operationsDone[block.number][uint8(Operations.UpdateValidators)] = true;
         require(newSet.length > 0, "Validator set empty!");
 
         // TODO: optimize
@@ -431,25 +453,19 @@ contract Validators is Params {
         tryRemoveValidatorIncoming(val);
 
         // remove the validator out of active set
-        // Note: the jailed validator may in active set if there is only one validator exist
+        // Note: the jailed validator may in active set if there is only one validator exists
         if (highestValidatorsSet.length > 1) {
             tryJailValidator(val);
 
             // call proposal contract to set unpass.
             // you have to repropose to be a validator.
             proposal.setUnpassed(val);
+            emit LogRemoveValidator(val, hb, hsct, block.timestamp);
         }
-
-        emit LogRemoveValidator(val, hb, hsct, block.timestamp);
     }
 
-    function punishValidator(address val) external onlyPunishContract {
-        uint256 hb = validatorInfo[val].hbIncoming;
-        uint256 hsct = validatorInfo[val].hsctIncoming;
-
+    function removeValidatorIncoming(address val) external onlyPunishContract {
         tryRemoveValidatorIncoming(val);
-
-        emit LogPunishValidator(val, hb, hsct, block.timestamp);
     }
 
     function getValidatorDescription(address val)
@@ -623,6 +639,8 @@ contract Validators is Params {
             }
         }
 
+        uint256 hb = validatorInfo[val].hbIncoming;
+        uint256 hsct = validatorInfo[val].hsctIncoming;
         validatorInfo[val].totalJailedHB = validatorInfo[val].totalJailedHB.add(
             validatorInfo[val].hbIncoming
         );
@@ -632,6 +650,8 @@ contract Validators is Params {
 
         validatorInfo[val].hbIncoming = 0;
         validatorInfo[val].hsctIncoming = 0;
+
+        emit LogRemoveValidatorIncoming(val, hb, hsct, block.timestamp);
     }
 
     function tryJailValidator(address val) private {
@@ -657,8 +677,9 @@ contract Validators is Params {
                     highestValidatorsSet[i] = highestValidatorsSet[highestValidatorsSet
                         .length - 1];
                 }
-                emit LogRemoveFromTopValidators(val, block.timestamp);
+                
                 highestValidatorsSet.pop();
+                emit LogRemoveFromTopValidators(val, block.timestamp);
 
                 break;
             }
