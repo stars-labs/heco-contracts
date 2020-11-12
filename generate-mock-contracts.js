@@ -7,7 +7,6 @@ const config = {
 
 var list = [
     { src: "contracts/Params.template", dst: "contracts/Params.sol" },
-    { src: "contracts/Validators.template", dst: "contracts/Validators.sol" },
 ];
 
 for (let i = 0; i < list.length; i++) {

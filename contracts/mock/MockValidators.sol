@@ -37,4 +37,8 @@ contract MockValidators {
     function setUnpassed(address who) public {
         proposal.setUnpassed(who);
     }
+
+    function tryReactive(address who) public returns (bool) {
+        return true;
+    }
 }

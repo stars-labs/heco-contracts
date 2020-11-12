@@ -144,6 +144,9 @@ contract Proposal is Params {
         ) {
             pass[proposals[id].dst] = true;
             proposals[id].resultExist = true;
+
+            // try to reactive validator if it isn't the first time
+            validators.tryReactive(proposals[id].dst);
             emit LogPassProposal(id, proposals[id].dst, block.timestamp);
 
             return true;

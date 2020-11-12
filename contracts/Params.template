@@ -81,6 +81,14 @@ contract Params {
         _;
     }
 
+    modifier onlyProposalContract() {
+        require(
+            msg.sender == ProposalAddr,
+            "Proposal contract only"
+        );
+        _;
+    }
+
     {% if mock %}
     function setContracts(address val, address punish, address proposal, address hsct) public {
         ValidatorContractAddr = val;

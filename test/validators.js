@@ -5,16 +5,17 @@ const Punish = artifacts.require("Punish");
 
 const { constants, expectRevert, expectEvent, time, ether, BN } = require('@openzeppelin/test-helpers');
 
-const Staked = new BN("1");
-const Unstaking = new BN("2");
+const Created = new BN("1");
+const Staked = new BN("2");
 const Unstaked = new BN("3");
 const Jailed = new BN("4");
 
 contract("Validators test", function (accounts) {
     var valIns, proposalIns, punishIns, initValidators;
     var miner = accounts[0];
-    var admin = accounts[0];
-    var premint = accounts[0];
+    var admin = accounts[1];
+    var premint = accounts[2];
+    var totalStake = new BN("0");
 
     before(async function () {
         valIns = await Validators.new();
@@ -35,7 +36,7 @@ contract("Validators test", function (accounts) {
         await punishIns.initialize();
     })
 
-    before("can only init once", async function () {
+    it("can only init once", async function () {
         await expectRevert(valIns.initialize(initValidators, admin), "Already initialized");
     })
 
@@ -50,45 +51,88 @@ contract("Validators test", function (accounts) {
         console.log("MinimalStakingCoin", MinimalStakingCoin.toString());
     })
 
+    describe("create or edit validator", async function () {
+        let validator = accounts[30];
+
+        it("can't create validator if fee addr == address(0)", async function () {
+            await expectRevert(valIns.createOrEditValidator(constants.ZERO_ADDRESS, "", "", "", "", "", { from: validator }), "Invalid fee address");
+        })
+
+        it("can't create validator if describe info invalid", async function () {
+            // invalid moniker
+            let moniker = getInvalidMoniker();
+            await expectRevert(valIns.createOrEditValidator(validator, moniker, "", "", "", "", { from: validator }), "Invalid moniker length");
+        })
+
+        it("can't create validator if not pass propose", async function () {
+            await expectRevert(valIns.createOrEditValidator(validator, "", "", "", "", "", { from: validator }), "You must be authorized first");
+        })
+
+        it("create validator", async function () {
+            await pass(proposalIns, initValidators, validator);
+            let receipt = await valIns.createOrEditValidator(validator, "", "", "", "", "", { from: validator });
+            expectEvent(receipt, "LogCreateValidator", { val: validator, fee: validator });
+
+            // check validator status
+            let status = await valIns.getValidatorInfo(validator);
+            assert.equal(status[1].eq(Created), true);
+        })
+
+        it("edit validator info", async function () {
+            let feeAddr = accounts[31];
+            let receipt = await valIns.createOrEditValidator(feeAddr, "", "", "", "", "", { from: validator });
+            expectEvent(receipt, "LogEditValidator", { val: validator, fee: feeAddr });
+        })
+    })
+
     // test for normal staking
-    describe("Staking", async function () {
+    describe("stake", async function () {
         it("norma stake", async function () {
             let stakingCase = [
-                { accountIndex: 3, staking: web3.utils.toWei("100"), isTopValidator: true },
-                { accountIndex: 4, staking: web3.utils.toWei("200"), isTopValidator: true },
-                { accountIndex: 5, staking: web3.utils.toWei("300"), isTopValidator: true },
-                { accountIndex: 6, staking: web3.utils.toWei("400"), isTopValidator: true },
-                { accountIndex: 7, staking: web3.utils.toWei("500"), isTopValidator: true },
-                { accountIndex: 8, staking: web3.utils.toWei("600"), isTopValidator: true },
-                { accountIndex: 9, staking: web3.utils.toWei("700"), isTopValidator: true },
-                { accountIndex: 10, staking: web3.utils.toWei("800"), isTopValidator: true },
-                { accountIndex: 11, staking: web3.utils.toWei("900"), isTopValidator: true },
-                { accountIndex: 12, staking: web3.utils.toWei("110"), isTopValidator: true },
-                { accountIndex: 13, staking: web3.utils.toWei("200"), isTopValidator: true },
-                { accountIndex: 14, staking: web3.utils.toWei("1000"), isTopValidator: true },
-                { accountIndex: 15, staking: web3.utils.toWei("2000"), isTopValidator: true },
-                { accountIndex: 16, staking: web3.utils.toWei("1000"), isTopValidator: true },
-                { accountIndex: 17, staking: web3.utils.toWei("1000"), isTopValidator: true },
-                { accountIndex: 18, staking: web3.utils.toWei("1020"), isTopValidator: true },
-                { accountIndex: 19, staking: web3.utils.toWei("1300"), isTopValidator: true },
-                { accountIndex: 20, staking: web3.utils.toWei("1400"), isTopValidator: true },
-                { accountIndex: 21, staking: web3.utils.toWei("1020"), isTopValidator: true },
+                { accountIndex: 3, staking: ether("100"), isTopValidator: true },
+                { accountIndex: 4, staking: ether("200"), isTopValidator: true },
+                { accountIndex: 5, staking: ether("300"), isTopValidator: true },
+                { accountIndex: 6, staking: ether("400"), isTopValidator: true },
+                { accountIndex: 7, staking: ether("500"), isTopValidator: true },
+                { accountIndex: 8, staking: ether("600"), isTopValidator: true },
+                { accountIndex: 9, staking: ether("700"), isTopValidator: true },
+                { accountIndex: 10, staking: ether("800"), isTopValidator: true },
+                { accountIndex: 11, staking: ether("900"), isTopValidator: true },
+                { accountIndex: 12, staking: ether("110"), isTopValidator: true },
+                { accountIndex: 13, staking: ether("200"), isTopValidator: true },
+                { accountIndex: 14, staking: ether("1000"), isTopValidator: true },
+                { accountIndex: 15, staking: ether("2000"), isTopValidator: true },
+                { accountIndex: 16, staking: ether("1000"), isTopValidator: true },
+                { accountIndex: 17, staking: ether("1000"), isTopValidator: true },
+                { accountIndex: 18, staking: ether("1020"), isTopValidator: true },
+                { accountIndex: 19, staking: ether("1300"), isTopValidator: true },
+                { accountIndex: 20, staking: ether("1400"), isTopValidator: true },
+                { accountIndex: 21, staking: ether("1020"), isTopValidator: true },
                 // 22
-                { accountIndex: 22, staking: web3.utils.toWei("120"), isTopValidator: true },
-                { accountIndex: 23, staking: web3.utils.toWei("200"), isTopValidator: true },
-                { accountIndex: 24, staking: web3.utils.toWei("110"), isTopValidator: true },
-                { accountIndex: 25, staking: web3.utils.toWei("50"), isTopValidator: false },
+                { accountIndex: 22, staking: ether("120"), isTopValidator: true },
+                { accountIndex: 23, staking: ether("200"), isTopValidator: true },
+                { accountIndex: 24, staking: ether("110"), isTopValidator: true },
+                { accountIndex: 25, staking: ether("50"), isTopValidator: false },
             ]
             let expectValidatorAccountIndex = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24];
 
             for (let i = 0; i < stakingCase.length; i++) {
                 let account = accounts[stakingCase[i].accountIndex];
+                let feeAddr = accounts[20 + stakingCase[i].accountIndex];
                 await pass(proposalIns, initValidators, account);
-                let receipt = await valIns.stake(account, "", "", "", "", "", { from: account, value: stakingCase[i].staking });
-                expectEvent(receipt, "LogCreateValidator", { val: account, fee: account, staking: stakingCase[i].staking });
+                let receipt = await valIns.createOrEditValidator(feeAddr, "", "", "", "", "", { from: account });
+                expectEvent(receipt, "LogCreateValidator", { val: account, fee: feeAddr });
+
+                totalStake = totalStake.add(stakingCase[i].staking);
+                receipt = await valIns.stake(account, { from: account, value: stakingCase[i].staking });
+                expectEvent(receipt, "LogStake", { staker: account, val: account, staking: stakingCase[i].staking });
 
                 let isVal = await valIns.isTopValidator(account);
                 assert.equal(isVal, stakingCase[i].isTopValidator);
+
+                // check total stake
+                let acutalStake = await valIns.totalStake();
+                assert.equal(totalStake.eq(acutalStake), true);
             }
 
             // check final top validators
@@ -100,166 +144,310 @@ contract("Validators test", function (accounts) {
             }
         })
 
+        it("staker info and list in validator should be right updated", async function () {
+            let validator = accounts[42];
+            await pass(proposalIns, initValidators, validator);
+            await valIns.createOrEditValidator(validator, "", "", "", "", "", { from: validator });
+
+            let staker_1 = accounts[43];
+            await valIns.stake(validator, { from: staker_1, value: ether('32') });
+
+            let info = await valIns.getValidatorInfo(validator);
+            assert.equal(info[8].length, 1);
+            assert.equal(info[8][0], staker_1);
+            let stakingInfo = await valIns.getStakingInfo(staker_1, validator);
+            assert.equal(stakingInfo[2].toNumber(), 0);
+
+
+            let staker_2 = accounts[44];
+            await valIns.stake(validator, { from: staker_2, value: ether('32') });
+            info = await valIns.getValidatorInfo(validator);
+            assert.equal(info[8].length, 2);
+            assert.equal(info[8][1], staker_2);
+            stakingInfo = await valIns.getStakingInfo(staker_2, validator);
+            assert.equal(stakingInfo[2].toNumber(), 1);
+
+            let staker_3 = accounts[45];
+            await valIns.stake(validator, { from: staker_3, value: ether('32') });
+            info = await valIns.getValidatorInfo(validator);
+            assert.equal(info[8].length, 3);
+            assert.equal(info[8][2], staker_3);
+            stakingInfo = await valIns.getStakingInfo(staker_3, validator);
+            assert.equal(stakingInfo[2].toNumber(), 2);
+
+            // staker_3 add stake won't increase list
+            staker_3 = accounts[45];
+            await valIns.stake(validator, { from: staker_3, value: ether('32') });
+            info = await valIns.getValidatorInfo(validator);
+            assert.equal(info[8].length, 3);
+            assert.equal(info[8][2], staker_3);
+            stakingInfo = await valIns.getStakingInfo(staker_3, validator);
+            assert.equal(stakingInfo[2].toNumber(), 2);
+
+            // staker 1 unstake
+            await valIns.unstake(validator, { from: staker_1 });
+            info = await valIns.getValidatorInfo(validator);
+            assert.equal(info[8].length, 2);
+            // staker_3 will be place in the index of unstaked user
+            assert.equal(info[8][0], staker_3);
+            stakingInfo = await valIns.getStakingInfo(staker_3, validator);
+            assert.equal(stakingInfo[2].toNumber(), 0);
+            stakingInfo = await valIns.getStakingInfo(staker_1, validator);
+            assert.equal(stakingInfo[2].toNumber(), 0);
+
+            // the last one unstake won't change index
+            await valIns.unstake(validator, { from: staker_2 })
+            info = await valIns.getValidatorInfo(validator);
+            assert.equal(info[8].length, 1);
+            // staker_2 will be removed
+            assert.equal(info[8][0], staker_3);
+            stakingInfo = await valIns.getStakingInfo(staker_3, validator);
+            assert.equal(stakingInfo[2].toNumber(), 0);
+            stakingInfo = await valIns.getStakingInfo(staker_2, validator);
+            assert.equal(stakingInfo[2].toNumber(), 0);
+
+            // staker_1 restake will add to list
+            let lock = await valIns.StakingLockPeriod();
+            for (let i = 0; i < lock.toNumber(); i++) {
+                await time.advanceBlock();
+            }
+            await valIns.withdrawStaking(validator, { from: staker_1 });
+            await valIns.stake(validator, { from: staker_1, value: ether('33') });
+            info = await valIns.getValidatorInfo(validator);
+            assert.equal(info[8].length, 2);
+            // staker_2 will be removed
+            assert.equal(info[8][1], staker_1);
+            stakingInfo = await valIns.getStakingInfo(staker_1, validator);
+            assert.equal(stakingInfo[2].toNumber(), 1);
+        })
+
         it("can't stake situation", async function () {
-            // not pass proposal
-            let account = accounts[30];
-            await expectRevert(valIns.stake(account, "", "", "", "", "", { from: account, value: web3.utils.toWei("100") }), "You must be authorized first");
+            // validator not exist
+            let validator = accounts[31];
+            await expectRevert(valIns.stake(validator, { from: validator, value: ether("100") }), "Can't stake to a validator in abnormal status");
+            await expectRevert(valIns.stake(constants.ZERO_ADDRESS, { from: validator, value: ether("100") }), "Can't stake to a validator in abnormal status");
 
+            await pass(proposalIns, initValidators, validator);
+            await expectRevert(valIns.stake(validator, { from: validator, value: ether("100") }), "Can't stake to a validator in abnormal status");
+
+            await valIns.createOrEditValidator(validator, "", "", "", "", "", { from: validator });
             // stake amount not enough
-            let stake = web3.utils.toWei("1");
-            await pass(proposalIns, initValidators, account);
-            await expectRevert(valIns.stake(account, "", "", "", "", "", { from: account, value: stake }), "Staking coins not enough");
+            let stake = ether("1");
+            await expectRevert(valIns.stake(validator, { from: validator, value: stake }), "Staking coins not enough");
+        })
 
-            // invalid fee addr
-            stake = await valIns.MinimalStakingCoin();
-            await expectRevert(valIns.stake(constants.ZERO_ADDRESS, "", "", "", "", "", { from: account, value: stake }), "Invalid fee address");
+        it("normal stake", async function () {
+            let validator = accounts[31];
+            let minimal = await valIns.MinimalStakingCoin();
 
-            // invalid describe
-            let invalidMoniker = getInvalidMoniker();
-            await expectRevert(valIns.stake(account, invalidMoniker, "", "", "", "", { from: account, value: stake }), "Invalid moniker length");
+            let receipt = await valIns.stake(validator, { from: validator, value: minimal });
+            expectEvent(receipt, "LogStake", { staker: validator, val: validator, staking: minimal });
+
+            let stakingInfo = await valIns.getStakingInfo(validator, validator);
+            assert.equal(stakingInfo[0].eq(minimal), true);
+            assert.equal(stakingInfo[1].isZero(), true);
+
+            // check validator info
+            let info = await valIns.getValidatorInfo(validator);
+            assert.equal(info[1].eq(Staked), true);
+            assert.equal(info[2].eq(minimal), true);
+        })
+
+        it("anyone can stake to a validator(less than minimal)", async function () {
+            let validator = accounts[31];
+            let staker = accounts[30];
+            let stake = ether('1');
+
+            let receipt = await valIns.stake(validator, { from: staker, value: stake });
+            expectEvent(receipt, "LogStake", { staker: staker, val: validator, staking: stake });
+
+            let stakingInfo = await valIns.getStakingInfo(staker, validator);
+            assert.equal(stakingInfo[0].eq(stake), true);
+            assert.equal(stakingInfo[1].isZero(), true);
+
+            // check validator info
+            let info = await valIns.getValidatorInfo(validator);
+            assert.equal(info[1].eq(Staked), true);
+            // 32 + 1
+            assert.equal(info[2].eq(ether('33')), true);
         })
 
         it("normal add stake", async function () {
-            let account = accounts[1];
-            let addStake = web3.utils.toWei("200");
+            let validator = accounts[31];
+            let staker = accounts[30];
+            let addStake = ether('1');
 
-            let receipt = await valIns.stake(account, "", "", "", "", "", { from: account, value: addStake });
+            let receipt = await valIns.stake(validator, { from: staker, value: addStake });
+            expectEvent(receipt, "LogStake", { staker: staker, val: validator, staking: addStake });
 
-            expectEvent(receipt, "LogAddStake", { val: account, addAmount: addStake });
-            // this account will be top validator
-            let is = await valIns.isTopValidator(account);
-            assert.equal(is, true);
+            let stakingInfo = await valIns.getStakingInfo(staker, validator);
+            assert.equal(stakingInfo[0].eq(ether('2')), true);
+            assert.equal(stakingInfo[1].isZero(), true);
+
+            // check validator info
+            let info = await valIns.getValidatorInfo(validator);
+            assert.equal(info[1].eq(Staked), true);
+            // 32 + 2
+            assert.equal(info[2].eq(ether('34')), true);
+        })
+    })
+
+    // test for normal unstake
+    describe("unstake/withdraw", async function () {
+
+        it("can't unstake if no stake exist", async function () {
+            let validator = accounts[31];
+            let staker = accounts[1];
+
+            await expectRevert(valIns.unstake(validator, { from: staker }), "You don't have any stake");
         })
 
-        it("withdraw stake will transfer stake back to original validator", async function () {
-            let val = accounts[41];
-            let fee = accounts[42];
-            let stake = ether('100');
-            await pass(proposalIns, initValidators, val);
-            await valIns.stake(fee, "", "", "", "", "", { from: val, value: stake });
+        it("can't withdraw if not unstake before", async function () {
+            let validator = accounts[31];
+            let staker = accounts[30];
 
-            await valIns.unstake({ from: val });
+            await expectRevert(
+                valIns.withdrawStaking(validator, { from: staker }),
+                "You have to unstake first"
+            )
+        })
+
+        it("normal unstake", async function () {
+            let validator = accounts[31];
+            let staker = accounts[30];
+
+            let totalStakeBefore = await valIns.totalStake();
+
+            let receipt = await valIns.unstake(validator, { from: staker });
+            // 1 + 1
+            expectEvent(receipt, "LogUnstake", { staker: staker, val: validator, amount: ether('2') })
+
+            let totalStakeAfter = await valIns.totalStake();
+            assert.equal(totalStakeBefore.sub(totalStakeAfter).eq(ether('2')), true);
+
+            // check validator info
+            let info = await valIns.getValidatorInfo(validator);
+            assert.equal(info[2].eq(ether('32')), true);
+
+            // check staking info
+            info = await valIns.getStakingInfo(staker, validator);
+            assert.equal(info[0].isZero(), false);
+            assert.equal(info[1].isZero(), false);
+        })
+
+        it("can't stake when you are unstaking", async function () {
+            let validator = accounts[31];
+            let staker = accounts[30];
+
+            await expectRevert(valIns.stake(validator, { from: staker }), "Can't stake when you are unstaking");
+        })
+
+        it("can't unstake if you are already unstaked", async function () {
+            let validator = accounts[31];
+            let staker = accounts[30];
+
+            await expectRevert(valIns.unstake(validator, { from: staker }), "You are already in unstaking status");
+        })
+
+        it("can't withdraw if stake locked", async function () {
+            let validator = accounts[31];
+            let staker = accounts[30];
+
+            await expectRevert(valIns.withdrawStaking(validator, { from: staker }), "Your staking haven't unlocked yet");
+        })
+
+        it("can withdraw stake if unlocked", async function () {
+            let validator = accounts[31];
+            let staker = accounts[30];
 
             let lock = await valIns.StakingLockPeriod();
             for (let i = 0; i < lock.toNumber(); i++) {
                 await time.advanceBlock();
             }
 
-            let receipt = await valIns.withdrawStaking({ from: val });
-            expectEvent(receipt, "LogWithdrawStaking", { val: val, amount: stake });
+            let receipt = await valIns.withdrawStaking(validator, { from: staker });
+            expectEvent(receipt, "LogWithdrawStaking", { staker: staker, val: validator, amount: ether('2') });
         })
-    })
 
-    describe("Edit validator", async function () {
-        // edit validator info
-        it("Edit validator info", async function () {
-            // validator not exist
-            let account = accounts[31];
-            await expectRevert(valIns.editValidator(account, "", "", "", "", "", { from: account }), "Validator not exist");
-
-            // fee addr invalid
-            account = accounts[1];
-            await expectRevert(valIns.editValidator(constants.ZERO_ADDRESS, "", "", "", "", "", { from: account }), "Invalid fee address");
-
-            // invalid moniker
-            let moniker = getInvalidMoniker();
-            await expectRevert(valIns.editValidator(account, moniker, "", "", "", "", { from: account }), "Invalid moniker length");
-        })
-    })
-
-    // test for normal unstake
-    describe("unstake", async function () {
-        it("normal unstake", async function () {
-            let account = accounts[1];
-            let is = await valIns.isTopValidator(account);
+        it("unstake change validator status to unstaked and unpass ", async function () {
+            let validator = accounts[21];
+            let staker = validator;
+            let is = await valIns.isTopValidator(validator);
             assert.equal(is, true);
+            let isPass = await proposalIns.pass(validator);
+            assert.equal(isPass, true);
 
-            let receipt = await valIns.unstake({ from: account });
-            expectEvent(receipt, "LogUnstake", { val: account });
+            let receipt = await valIns.unstake(validator, { from: staker });
+            expectEvent(receipt, "LogUnstake", { staker: staker, val: validator, amount: ether('1020') });
+
             // not top validator any more
-            is = await valIns.isTopValidator(account);
+            is = await valIns.isTopValidator(validator);
             assert.equal(is, false);
             let topValidators = await valIns.getTopValidators();
             assert.equal(topValidators.length, 20);
+
             // check validator status
-            let info = await valIns.getValidatorInfo(account);
-            assert.equal(info[1].eq(Unstaking), true);
-        })
-
-        it("can't unstake situation", async function () {
-            // validator not exist
-            let account = accounts[31];
-            await expectRevert(valIns.unstake({ from: account }), "Invalid status, can't unstake");
-
-            // validator is unstaking
-            account = accounts[1];
-            await expectRevert(valIns.unstake({ from: account }), "Invalid status, can't unstake");
-        })
-
-        it("can't withdraw staking back if locked", async function () {
-            let account = accounts[1];
-            await expectRevert(valIns.withdrawStaking({ from: account }), "Your staking haven't unlocked yet");
-        })
-
-        it("can withdraw staking back if unlocked", async function () {
-            let account = accounts[1];
-            let blocks = await valIns.StakingLockPeriod();
-
-            for (let i = 0; i < blocks.toNumber(); i++) {
-                await time.advanceBlock();
-            }
-
-            let info = await valIns.getValidatorInfo(account);
-            let receipt = await valIns.withdrawStaking({ from: account });
-            expectEvent(receipt, "LogWithdrawStaking", { val: account, amount: info[2] });
-            info = await valIns.getValidatorInfo(account);
+            let info = await valIns.getValidatorInfo(validator);
             assert.equal(info[1].eq(Unstaked), true);
+            assert.equal(info[2].isZero(), true);
+
+            // check proposal status of validator
+            isPass = await proposalIns.pass(validator);
+            assert.equal(isPass, false);
+        })
+
+        it("can't stake to a unstaked validator", async function () {
+            let staker = accounts[31];
+            let validator = accounts[21];
+
+            await expectRevert(valIns.stake(validator, { from: staker, value: ether('100') }), "Can't stake to a validator in abnormal status");
         })
     })
 
-    describe("repropose to be a validator if removed", async function () {
-        let unstakedAccount = accounts[1];
-
-        it("can't stake if removed without withdraw stake or repass proposal", async function () {
-            let stake = web3.utils.toWei("100");
-
-            await expectRevert(valIns.stake(unstakedAccount, "", "", "", "", "", { from: unstakedAccount, value: stake }), "You must be authorized first");
-        })
+    describe("repropose to be a validator if unstaked", async function () {
+        let unstakedAccount = accounts[21];
+        let staker = accounts[20];
 
         it("unstaked val can repropose", async function () {
-            await pass(proposalIns, initValidators, unstakedAccount);
-        })
-
-        it("can't stake if stake < min stake", async function () {
-            let stake = web3.utils.toWei("1");
-
-            await expectRevert(valIns.stake(unstakedAccount, "", "", "", "", "", { from: unstakedAccount, value: stake }), "Staking coins not enough");
-        })
-
-        it("can stake if pass proposal and stake amount >= minimal", async function () {
-            let stake = web3.utils.toWei("1000");
-
-            // check status
             let info = await valIns.getValidatorInfo(unstakedAccount);
             assert.equal(info[1].eq(Unstaked), true);
 
-            let receipt = await valIns.stake(unstakedAccount, "", "", "", "", "", { from: unstakedAccount, value: stake });
-            expectEvent(receipt, "LogRestake", { val: unstakedAccount, restake: stake });
+            await pass(proposalIns, initValidators, unstakedAccount);
+            info = await valIns.getValidatorInfo(unstakedAccount);
+            assert.equal(info[1].eq(Created), true);
+        })
+
+        it("can't stake if stake < min stake", async function () {
+            let stake = ether("1");
+
+            await expectRevert(valIns.stake(unstakedAccount, { from: staker, value: stake }), "Staking coins not enough");
+        })
+
+        it("can stake if pass proposal and stake amount >= minimal", async function () {
+            let stake = ether("1000");
+
+            // check status
+            let info = await valIns.getValidatorInfo(unstakedAccount);
+            assert.equal(info[1].eq(Created), true);
+
+            let receipt = await valIns.stake(unstakedAccount, { from: staker, value: stake });
+            expectEvent(receipt, "LogStake", { staker: staker, val: unstakedAccount, staking: stake });
 
             info = await valIns.getValidatorInfo(unstakedAccount);
             assert.equal(info[1].eq(Staked), true);
 
-            await valIns.isTopValidator(unstakedAccount);
+            let isTop = await valIns.isTopValidator(unstakedAccount);
+            assert.equal(isTop, true);
         })
 
         it("you can unstake", async function () {
-            let receipt = await valIns.unstake({ from: unstakedAccount });
-            expectEvent(receipt, "LogUnstake", { val: unstakedAccount })
+            let receipt = await valIns.unstake(unstakedAccount, { from: staker });
+            expectEvent(receipt, "LogUnstake", { staker, staker, val: unstakedAccount })
         })
     })
 
     describe("deposit block reward and profits", async function () {
-        let fee = web3.utils.toWei("0.3");
+        let fee = ether("0.3");
         it("miner can deposit to validator contract", async function () {
             let receipt = await valIns.depositBlockReward({ from: miner, value: fee });
 
@@ -267,8 +455,8 @@ contract("Validators test", function (accounts) {
 
             let info = await valIns.getValidatorInfo(miner);
 
+            assert.equal(info[3].toString(10), fee.toString(10));
             assert.equal(info[4].toString(10), fee.toString(10));
-            assert.equal(info[5].toString(10), fee.toString(10));
         })
 
         it("validator can withdraw profits", async function () {
@@ -278,7 +466,7 @@ contract("Validators test", function (accounts) {
 
             fee = ether('0.5');
             feeAddr = accounts[10];
-            await valIns.editValidator(feeAddr, "", "", "", "", "", { from: miner });
+            await valIns.createOrEditValidator(feeAddr, "", "", "", "", "", { from: miner });
             await valIns.depositBlockReward({ from: miner, value: fee });
 
             // advance block
@@ -354,15 +542,16 @@ contract("Punish", function (accounts) {
     it("prepare", async function () {
         for (let i = 0; i < initValidators.length; i++) {
             let val = initValidators[i];
-            await valIns.stake(val, "", "", "", "", "", { from: initValidators[i], value: web3.utils.toWei("100") });
+            await valIns.stake(val, { from: initValidators[i], value: ether("100") });
         }
     })
 
     describe("punish val", async function () {
+
         it("miner can punish validator", async function () {
             let removeThreshold = await punishIns.removeThreshold();
             let punishThreshold = await punishIns.punishThreshold();
-            let fee = web3.utils.toWei("0.4");
+            let fee = ether("0.4");
 
             for (let i = 0; i < removeThreshold.toNumber(); i++) {
                 // deposit
@@ -383,8 +572,8 @@ contract("Punish", function (accounts) {
                     assert.equal(recordInfo.toNumber(), 0);
                     assert.equal(info[1].eq(Jailed), true);
                 } else if ((i + 1) % punishThreshold.toNumber() == 0) {
+                    assert.equal(info[3].toNumber(), 0);
                     assert.equal(info[4].toNumber(), 0);
-                    assert.equal(info[5].toNumber(), 0);
                 }
             }
 
@@ -396,15 +585,15 @@ contract("Punish", function (accounts) {
             let multi = new BN(removeThreshold.toString());
             let expectFee = feeBN.mul(multi).div(new BN("2"));
             let expectReward = RewardBN.mul(multi).div(new BN("2"));
-            assert.equal(info[4].toString(), expectFee.toString());
-            assert.equal(info[5].toString(), expectReward.toString());
+            assert.equal(info[3].toString(), expectFee.toString());
+            assert.equal(info[4].toString(), expectReward.toString());
 
             // get punish info
             info = await valIns.getValidatorInfo(miner);
+            assert.equal(info[3].isZero(), true);
             assert.equal(info[4].isZero(), true);
-            assert.equal(info[5].isZero(), true);
-            assert.equal(info[6].toString(), feeBN.mul(multi).toString());
-            assert.equal(info[7].toString(), RewardBN.mul(multi).toString());
+            assert.equal(info[5].toString(), feeBN.mul(multi).toString());
+            assert.equal(info[6].toString(), RewardBN.mul(multi).toString());
         })
 
         it("validator missed record will decrease if necessary", async function () {
@@ -442,59 +631,34 @@ contract("Punish", function (accounts) {
             assert.equal(acutal_1.toNumber(), step);
         })
 
-        it("jailed validator can't stake if not withdraw staking or not repass proposal", async function () {
+        it("Can't stake to a jailed validator", async function () {
             let jailed = initValidators[0];
             let record = await punishIns.getPunishRecord(jailed);
             assert.equal(record.isZero(), false);
 
             let info = await valIns.getValidatorInfo(jailed);
-            assert.equal(info[3].isZero(), false);
+            assert.equal(info[2].isZero(), false);
 
             // not repass proposal
             await expectRevert(
-                valIns.stake(jailed, "", "", "", "", "", { from: jailed, value: ether("32") }),
-                "You must be authorized first"
-            )
-
-            await pass(proposalIns, initValidators, jailed);
-            await expectRevert(
-                valIns.stake(jailed, "", "", "", "", "", { from: jailed, value: ether("32") }),
-                "You can only add stake when staked"
-            )
-
-            // step block number to pass staking lock
-            let blocks = await valIns.StakingLockPeriod();
-            for (let i = 0; i < blocks.toNumber(); i++) {
-                await time.advanceBlock();
-            }
-            await valIns.withdrawStaking({ from: jailed });
-
-            // stake amount not enough
-            await expectRevert(
-                valIns.stake(jailed, "", "", "", "", "", { from: jailed, value: ether("31") }),
-                "Staking coins not enough"
+                valIns.stake(jailed, { from: jailed, value: ether("32") }),
+                "Can't stake to a validator in abnormal status"
             )
         })
 
-        it("jailed validator stake will clean record", async function () {
+        it("jailed record will be cleaned if validator repass proposal", async function () {
             let jailed = initValidators[0];
             let record = await punishIns.getPunishRecord(jailed);
             assert.equal(record.isZero(), false);
 
-            // now you can stake
-            let info = await valIns.getValidatorInfo(jailed);
-            let beforeStake = info[2];
-            assert.equal(beforeStake.isZero(), true);
-            let receipt = await valIns.stake(jailed, "", "", "", "", "", { from: jailed, value: ether('100') });
-            expectEvent(receipt, "LogRestake", { val: jailed, restake: ether('100') });
+            await pass(proposalIns, initValidators, jailed);
 
-            // stake should right updated
-            info = await valIns.getValidatorInfo(jailed);
-            assert.equal(ether('100').eq(info[2]), true);
+            // check status is crated
 
-            // record is cleared
+            // check record
             record = await punishIns.getPunishRecord(jailed);
             assert.equal(record.isZero(), true);
+
             // not in punish list
             let len = await punishIns.getPunishValidatorsLen();
 
@@ -502,6 +666,19 @@ contract("Punish", function (accounts) {
                 let punishee = await punishIns.punishValidators(i);
                 assert.equal(punishee == jailed, false);
             }
+        })
+
+        it("can stake to a jailed validator if he repass proposal(staked exist)", async function () {
+            let staker = accounts[5];
+            let jailed = initValidators[0];
+            let stake = ether('1');
+
+            await valIns.stake(jailed, { from: staker, value: stake });
+
+            // get jailed validator info
+            let info = await valIns.getValidatorInfo(jailed);
+            // original 100 + stake 1
+            assert.equal(info[2].eq(ether('101')), true);
         })
     })
 })
