@@ -10,8 +10,6 @@ contract Params {
         public constant PunishContractAddr = 0x000000000000000000000000000000000000F001;
     address
         public constant ProposalAddr = 0x000000000000000000000000000000000000F002;
-    address
-        public constant HsctTokenAddr = 0x000000000000000000000000000000000000F003;
 
     // System params
     uint16 public constant MaxValidators = 21;

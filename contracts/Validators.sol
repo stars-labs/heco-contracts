@@ -4,7 +4,6 @@ import "./Params.sol";
 import "./Proposal.sol";
 import "./Punish.sol";
 import "./library/SafeMath.sol";
-import "./HSCTToken.sol";
 
 contract Validators is Params {
     using SafeMath for uint256;
@@ -36,9 +35,7 @@ contract Validators is Params {
         uint256 coins;
         Description description;
         uint256 hbIncoming;
-        uint256 hsctIncoming;
         uint256 totalJailedHB;
-        uint256 totalJailedHSCT;
         uint256 lastWithdrawProfitsBlock;
         // Address list of user who has staked for this validator
         address[] stakers;
@@ -53,11 +50,6 @@ contract Validators is Params {
         uint256 index;
     }
 
-    struct Dec {
-        uint256 multi;
-        uint256 divisor;
-    }
-
     mapping(address => Validator) validatorInfo;
     // staker => validator => info
     mapping(address => mapping(address => StakingInfo)) staked;
@@ -66,17 +58,13 @@ contract Validators is Params {
     address[] public currentValidatorSet;
     // store highest validator set(sort by staking, dynamic changed)
     address[] public highestValidatorsSet;
-    // calculate block profit
-    Dec dec;
-    // admin
-    address public admin;
+    // total stake of all validators
     uint256 public totalStake;
+    // total jailed hb
     uint256 public totalJailedHB;
-    uint256 public totalJailedHSCT;
 
     // System contracts
     Proposal proposal;
-    HSCTToken hsctToken;
     Punish punish;
 
     enum Operations {Deposit, UpdateValidators}
@@ -112,27 +100,15 @@ contract Validators is Params {
         address indexed val,
         address indexed fee,
         uint256 hb,
-        uint256 hsct,
         uint256 time
     );
-    event LogRemoveValidator(
-        address indexed val,
-        uint256 hb,
-        uint256 hsct,
-        uint256 time
-    );
+    event LogRemoveValidator(address indexed val, uint256 hb, uint256 time);
     event LogRemoveValidatorIncoming(
         address indexed val,
         uint256 hb,
-        uint256 hsct,
         uint256 time
     );
-    event LogDepositBlockReward(
-        address indexed val,
-        uint256 hb,
-        uint256 hsct,
-        uint256 time
-    );
+    event LogDepositBlockReward(address indexed val, uint256 hb, uint256 time);
     event LogUpdateValidator(address[] newSet);
     event LogStake(
         address indexed staker,
@@ -141,11 +117,6 @@ contract Validators is Params {
         uint256 time
     );
     event LogChangeDec(uint256 newMulti, uint256 newDivisor, uint256 time);
-
-    modifier onlyAdmin() {
-        require(msg.sender == admin, "Admin only");
-        _;
-    }
 
     modifier onlyNotReward() {
         require(
@@ -164,17 +135,9 @@ contract Validators is Params {
         _;
     }
 
-    function initialize(address[] calldata vals, address admin_)
-        external
-        onlyNotInitialized
-    {
+    function initialize(address[] calldata vals) external onlyNotInitialized {
         proposal = Proposal(ProposalAddr);
-        hsctToken = HSCTToken(HsctTokenAddr);
         punish = Punish(PunishContractAddr);
-        dec.multi = 100;
-        dec.divisor = 100;
-        require(admin_ != address(0), "Invalid admin address");
-        admin = admin_;
 
         for (uint256 i = 0; i < vals.length; i++) {
             require(vals[i] != address(0), "Invalid validator address");
@@ -195,18 +158,6 @@ contract Validators is Params {
         }
 
         initialized = true;
-    }
-
-    function changeDec(uint256 multi_, uint256 divisor_)
-        public
-        onlyInitialized
-        onlyAdmin
-    {
-        require(divisor_ != 0, "Invalid divisor");
-        dec.multi = multi_;
-        dec.divisor = divisor_;
-
-        emit LogChangeDec(multi_, divisor_, block.timestamp);
     }
 
     // stake for the validator
@@ -431,11 +382,9 @@ contract Validators is Params {
         );
 
         uint256 hbIncoming = validatorInfo[validator].hbIncoming;
-        uint256 hsctIncoming = validatorInfo[validator].hsctIncoming;
 
         // update info
         validatorInfo[validator].hbIncoming = 0;
-        validatorInfo[validator].hsctIncoming = 0;
         validatorInfo[validator].lastWithdrawProfitsBlock = block.number;
 
         // send profits to fee address
@@ -443,15 +392,10 @@ contract Validators is Params {
             safeTransferHB(feeAddr, hbIncoming);
         }
 
-        if (hsctIncoming > 0) {
-            safeTransferHSCT(feeAddr, hsctIncoming);
-        }
-
         emit LogWithdrawProfits(
             validator,
             feeAddr,
             hbIncoming,
-            hsctIncoming,
             block.timestamp
         );
 
@@ -468,29 +412,17 @@ contract Validators is Params {
     {
         operationsDone[block.number][uint8(Operations.Deposit)] = true;
         address val = msg.sender;
-        uint256 hsct = msg.value;
+        uint256 hb = msg.value;
 
         // never reach this
         if (validatorInfo[val].status == Status.NotExist) {
             return;
         }
 
-        validatorInfo[val].hbIncoming = validatorInfo[val].hbIncoming.add(hsct);
+        // Jailed validator can't get profits.
+        addProfitsToActiveValidatorsByStakePercentExpect(hb, address(0));
 
-        // calculate actual hsct profit
-        uint256 hsctMint = hsct.mul(dec.multi).div(dec.divisor);
-        // mint hsct token for this contract
-        hsctMint = hsctToken.mint(address(this), hsctMint);
-
-        validatorInfo[val].hsctIncoming = validatorInfo[val].hsctIncoming.add(
-            hsctMint
-        );
-        // mint token for this contract, then validator can withdraw it
-        if (validatorInfo[val].status == Status.Jailed) {
-            tryRemoveValidatorIncoming(val);
-        }
-
-        emit LogDepositBlockReward(val, hsct, hsctMint, block.timestamp);
+        emit LogDepositBlockReward(val, hb, block.timestamp);
     }
 
     function updateActiveValidatorSet(address[] memory newSet, uint256 epoch)
@@ -518,7 +450,6 @@ contract Validators is Params {
 
     function removeValidator(address val) external onlyPunishContract {
         uint256 hb = validatorInfo[val].hbIncoming;
-        uint256 hsct = validatorInfo[val].hsctIncoming;
 
         tryRemoveValidatorIncoming(val);
 
@@ -530,7 +461,7 @@ contract Validators is Params {
             // call proposal contract to set unpass.
             // you have to repropose to be a validator.
             proposal.setUnpassed(val);
-            emit LogRemoveValidator(val, hb, hsct, block.timestamp);
+            emit LogRemoveValidator(val, hb, block.timestamp);
         }
     }
 
@@ -570,8 +501,6 @@ contract Validators is Params {
             uint256,
             uint256,
             uint256,
-            uint256,
-            uint256,
             address[] memory
         )
     {
@@ -587,9 +516,7 @@ contract Validators is Params {
             v.status,
             v.coins,
             v.hbIncoming,
-            v.hsctIncoming,
             v.totalJailedHB,
-            v.totalJailedHSCT,
             v.lastWithdrawProfitsBlock,
             stakers
         );
@@ -612,12 +539,33 @@ contract Validators is Params {
     }
 
     function getActiveValidators() public view returns (address[] memory) {
-        address[] memory activeSet = new address[](currentValidatorSet.length);
+        return currentValidatorSet;
+    }
 
+    function getTotalStakeOfActiveValidators()
+        public
+        view
+        returns (uint256 total, uint256 len)
+    {
+        return getTotalStakeOfActiveValidatorsExpect(address(0));
+    }
+
+    function getTotalStakeOfActiveValidatorsExpect(address val)
+        private
+        view
+        returns (uint256 total, uint256 len)
+    {
         for (uint256 i = 0; i < currentValidatorSet.length; i++) {
-            activeSet[i] = currentValidatorSet[i];
+            if (
+                validatorInfo[currentValidatorSet[i]].status != Status.Jailed &&
+                val != currentValidatorSet[i]
+            ) {
+                total = total.add(validatorInfo[currentValidatorSet[i]].coins);
+                len++;
+            }
         }
-        return activeSet;
+
+        return (total, len);
     }
 
     function isActiveValidator(address who) public view returns (bool) {
@@ -641,12 +589,7 @@ contract Validators is Params {
     }
 
     function getTopValidators() public view returns (address[] memory) {
-        address[] memory topSet = new address[](highestValidatorsSet.length);
-
-        for (uint256 i = 0; i < highestValidatorsSet.length; i++) {
-            topSet[i] = highestValidatorsSet[i];
-        }
-        return topSet;
+        return highestValidatorsSet;
     }
 
     function validateDescription(
@@ -677,6 +620,7 @@ contract Validators is Params {
 
         if (highestValidatorsSet.length < MaxValidators) {
             highestValidatorsSet.push(val);
+            emit LogAddToTopValidators(val, block.timestamp);
             return;
         }
 
@@ -712,42 +656,67 @@ contract Validators is Params {
         ) {
             return;
         }
-        uint256 luckHBIncoming = validatorInfo[val].hbIncoming.div(
-            currentValidatorSet.length - 1
-        );
-        uint256 luckHSCTIncoming = validatorInfo[val].hsctIncoming.div(
-            currentValidatorSet.length - 1
-        );
-
-        for (uint256 i = 0; i < currentValidatorSet.length; i++) {
-            if (val != currentValidatorSet[i]) {
-                validatorInfo[currentValidatorSet[i]]
-                    .hbIncoming = luckHBIncoming.add(
-                    validatorInfo[currentValidatorSet[i]].hbIncoming
-                );
-                validatorInfo[currentValidatorSet[i]]
-                    .hsctIncoming = luckHSCTIncoming.add(
-                    validatorInfo[currentValidatorSet[i]].hsctIncoming
-                );
-            }
-        }
 
         uint256 hb = validatorInfo[val].hbIncoming;
-        uint256 hsct = validatorInfo[val].hsctIncoming;
+        addProfitsToActiveValidatorsByStakePercentExpect(hb, val);
         // for display purpose
         totalJailedHB = totalJailedHB.add(hb);
-        totalJailedHSCT = totalJailedHSCT.add(hsct);
         validatorInfo[val].totalJailedHB = validatorInfo[val].totalJailedHB.add(
-            validatorInfo[val].hbIncoming
+            hb
         );
-        validatorInfo[val].totalJailedHSCT = validatorInfo[val]
-            .totalJailedHSCT
-            .add(validatorInfo[val].hsctIncoming);
 
         validatorInfo[val].hbIncoming = 0;
-        validatorInfo[val].hsctIncoming = 0;
 
-        emit LogRemoveValidatorIncoming(val, hb, hsct, block.timestamp);
+        emit LogRemoveValidatorIncoming(val, hb, block.timestamp);
+    }
+
+    // add profits to all validators by stake percent expect the punished validator or jailed validator
+    function addProfitsToActiveValidatorsByStakePercentExpect(
+        uint256 totalReward,
+        address punishedVal
+    ) private {
+        uint256 totalRewardStake;
+        uint256 rewardValsLen;
+        (
+            totalRewardStake,
+            rewardValsLen
+        ) = getTotalStakeOfActiveValidatorsExpect(punishedVal);
+
+        if (rewardValsLen == 0) {
+            return;
+        }
+
+        // no stake(at genesis period)
+        if (totalRewardStake == 0) {
+            uint256 per = totalReward.div(rewardValsLen);
+
+            for (uint256 i = 0; i < currentValidatorSet.length; i++) {
+                address val = currentValidatorSet[i];
+                if (
+                    validatorInfo[val].status != Status.Jailed &&
+                    val != punishedVal
+                ) {
+                    validatorInfo[val].hbIncoming = validatorInfo[val]
+                        .hbIncoming
+                        .add(per);
+                }
+            }
+            return;
+        }
+
+        for (uint256 i = 0; i < currentValidatorSet.length; i++) {
+            address val = currentValidatorSet[i];
+            if (
+                validatorInfo[val].status != Status.Jailed && val != punishedVal
+            ) {
+                uint256 reward = totalReward.mul(validatorInfo[val].coins).div(
+                    totalRewardStake
+                );
+                validatorInfo[val].hbIncoming = validatorInfo[val]
+                    .hbIncoming
+                    .add(reward);
+            }
+        }
     }
 
     function tryJailValidator(address val) private {
@@ -764,7 +733,12 @@ contract Validators is Params {
     }
 
     function tryRemoveValidatorInHighestSet(address val) private {
-        for (uint256 i = 0; i < highestValidatorsSet.length; i++) {
+        for (
+            uint256 i = 0;
+            // ensure at least one validator exist
+            i < highestValidatorsSet.length && highestValidatorsSet.length > 1;
+            i++
+        ) {
             if (val == highestValidatorsSet[i]) {
                 // remove it
                 if (i != highestValidatorsSet.length - 1) {
@@ -785,13 +759,5 @@ contract Validators is Params {
             amount = address(this).balance;
         }
         to.transfer(amount);
-    }
-
-    function safeTransferHSCT(address to, uint256 amount) internal {
-        if (amount > hsctToken.balanceOf(address(this))) {
-            amount = hsctToken.balanceOf(address(this));
-        }
-
-        hsctToken.transfer(to, amount);
     }
 }

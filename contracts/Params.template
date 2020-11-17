@@ -8,7 +8,6 @@ contract Params {
     address public PunishContractAddr;
     address public ProposalAddr;
     address public PROPOSAL_ADDR;
-    address public HsctTokenAddr;
 
     // only for test
     address public miner;
@@ -21,8 +20,6 @@ contract Params {
         public constant PunishContractAddr = 0x000000000000000000000000000000000000F001;
     address
         public constant ProposalAddr = 0x000000000000000000000000000000000000F002;
-    address
-        public constant HsctTokenAddr = 0x000000000000000000000000000000000000F003;
 
     {% endif %}
     // System params
@@ -90,11 +87,10 @@ contract Params {
     }
 
     {% if mock %}
-    function setContracts(address val, address punish, address proposal, address hsct) public {
+    function setContracts(address val, address punish, address proposal) public {
         ValidatorContractAddr = val;
         PunishContractAddr = punish;
         ProposalAddr = proposal;
-        HsctTokenAddr = hsct;
     }
 
     function setMiner(address miner_) public {

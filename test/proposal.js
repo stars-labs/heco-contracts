@@ -1,7 +1,12 @@
 const MockValidators = artifacts.require("MockValidators");
 const Proposal = artifacts.require("Proposal");
 
-const { constants, expectRevert, expectEvent, time } = require('@openzeppelin/test-helpers');
+const {
+    constants,
+    expectRevert,
+    expectEvent,
+    time
+} = require('@openzeppelin/test-helpers');
 
 // Test content:
 // 1. initialize can only call once
@@ -33,7 +38,7 @@ contract("Proposal test", function (accounts) {
             assert.equal(exist, true, "initialize validator failed");
         }
 
-        await proposalIns.setContracts(mockVal.address, constants.ZERO_ADDRESS, constants.ZERO_ADDRESS, constants.ZERO_ADDRESS,);
+        await proposalIns.setContracts(mockVal.address, constants.ZERO_ADDRESS, constants.ZERO_ADDRESS);
         await proposalIns.initialize([]);
     });
 
@@ -45,7 +50,9 @@ contract("Proposal test", function (accounts) {
         let candidate = accounts[6];
         it('anyone can create proposal', async function () {
             for (let i = 0; i < accounts.length && i < 10; i++) {
-                let receipt = await proposalIns.createProposal(candidate, "", { from: accounts[i] });
+                let receipt = await proposalIns.createProposal(candidate, "", {
+                    from: accounts[i]
+                });
 
                 expectEvent(receipt, 'LogCreateProposal', {
                     proposer: accounts[i],
@@ -65,34 +72,57 @@ contract("Proposal test", function (accounts) {
         let id;
 
         it("normal vote for a proposal(3 true/2 false)", async function () {
-            let receipt = await proposalIns.createProposal(candidate, "test", { from: proposer });
+            let receipt = await proposalIns.createProposal(candidate, "test", {
+                from: proposer
+            });
             id = receipt.logs[0].args.id;
 
             for (let i = 0; i < 3; i++) {
-                let receipt = await proposalIns.voteProposal(id, true, { from: accounts[i] });
-                expectEvent(receipt, 'LogVote', { id: id, voter: accounts[i], auth: true });
+                let receipt = await proposalIns.voteProposal(id, true, {
+                    from: accounts[i]
+                });
+                expectEvent(receipt, 'LogVote', {
+                    id: id,
+                    voter: accounts[i],
+                    auth: true
+                });
 
                 if (i == 2) {
-                    expectEvent(receipt, 'LogPassProposal', { id: id, dst: candidate });
+                    expectEvent(receipt, 'LogPassProposal', {
+                        id: id,
+                        dst: candidate
+                    });
                 }
             }
 
-            receipt = await proposalIns.voteProposal(id, false, { from: accounts[3] });
-            expectEvent(receipt, 'LogVote', { id: id, voter: accounts[3], auth: false });
+            receipt = await proposalIns.voteProposal(id, false, {
+                from: accounts[3]
+            });
+            expectEvent(receipt, 'LogVote', {
+                id: id,
+                voter: accounts[3],
+                auth: false
+            });
         })
 
         it("only validator can vote for a proposal", async function () {
-            await expectRevert(proposalIns.voteProposal(id, false, { from: accounts[6] }), "Validator only");
+            await expectRevert(proposalIns.voteProposal(id, false, {
+                from: accounts[6]
+            }), "Validator only");
         })
 
         it("validator can only vote for a proposal once", async function () {
-            await expectRevert(proposalIns.voteProposal(id, false, { from: accounts[1] }), "You can't vote for a proposal twice");
+            await expectRevert(proposalIns.voteProposal(id, false, {
+                from: accounts[1]
+            }), "You can't vote for a proposal twice");
         })
 
         it("validator can't vote for proposal if it is expired", async function () {
             let step = await proposalIns.proposalLastingPeriod();
             await time.increase(step);
-            await expectRevert(proposalIns.voteProposal(id, false, { from: accounts[4] }), "Proposal expired");
+            await expectRevert(proposalIns.voteProposal(id, false, {
+                from: accounts[4]
+            }), "Proposal expired");
         })
 
         it("Validate candidate's info", async function () {
@@ -119,24 +149,44 @@ contract("Proposal test", function (accounts) {
         let id;
 
         it("normal vote(2 agree, 3 reject)", async function () {
-            let receipt = await proposalIns.createProposal(candidate, "test", { from: proposer });
+            let receipt = await proposalIns.createProposal(candidate, "test", {
+                from: proposer
+            });
             id = receipt.logs[0].args.id;
 
             for (let i = 0; i < 2; i++) {
-                let receipt = await proposalIns.voteProposal(id, true, { from: accounts[i] });
-                expectEvent(receipt, 'LogVote', { id: id, voter: accounts[i], auth: true });
+                let receipt = await proposalIns.voteProposal(id, true, {
+                    from: accounts[i]
+                });
+                expectEvent(receipt, 'LogVote', {
+                    id: id,
+                    voter: accounts[i],
+                    auth: true
+                });
 
                 if (i == 2) {
-                    expectEvent(receipt, 'LogPassProposal', { id: id, dst: candidate });
+                    expectEvent(receipt, 'LogPassProposal', {
+                        id: id,
+                        dst: candidate
+                    });
                 }
             }
 
             for (let i = 2; i < 5; i++) {
-                let receipt = await proposalIns.voteProposal(id, false, { from: accounts[i] });
-                expectEvent(receipt, 'LogVote', { id: id, voter: accounts[i], auth: false });
+                let receipt = await proposalIns.voteProposal(id, false, {
+                    from: accounts[i]
+                });
+                expectEvent(receipt, 'LogVote', {
+                    id: id,
+                    voter: accounts[i],
+                    auth: false
+                });
 
                 if (i == 4) {
-                    expectEvent(receipt, 'LogRejectProposal', { id: id, dst: candidate });
+                    expectEvent(receipt, 'LogRejectProposal', {
+                        id: id,
+                        dst: candidate
+                    });
                 }
             }
         })
