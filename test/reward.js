@@ -52,7 +52,7 @@ contract("Validators test", function (accounts) {
             let stakeInfo = await valIns.getTotalStakeOfActiveValidators();
 
             let reward = ether('1');
-            await valIns.depositBlockReward({
+            await valIns.distributeBlockReward({
                 from: miner,
                 value: reward
             });
@@ -73,7 +73,7 @@ contract("Validators test", function (accounts) {
 
             let before = await getBefore(valIns, initValidators);
             let reward = ether('1');
-            await valIns.depositBlockReward({
+            await valIns.distributeBlockReward({
                 from: miner,
                 value: reward
             });
@@ -104,7 +104,7 @@ contract("Validators test", function (accounts) {
 
             let before = await getBefore(valIns, initValidators);
             let reward = ether('1');
-            await valIns.depositBlockReward({
+            await valIns.distributeBlockReward({
                 from: miner,
                 value: reward
             });
@@ -158,7 +158,7 @@ contract("Validators test", function (accounts) {
             let before = await getBefore(valIns, initValidators);
             let reward = ether('1');
             let total = stake[1].add(stake[2]);
-            await valIns.depositBlockReward({
+            await valIns.distributeBlockReward({
                 from: miner,
                 value: reward
             });
@@ -202,7 +202,7 @@ contract("Validators test", function (accounts) {
 
             // at this time only one top validator, but three active validator(jailed, normal, unstake)
             let reward = ether('1');
-            await valIns.depositBlockReward({
+            await valIns.distributeBlockReward({
                 from: miner,
                 value: reward
             });

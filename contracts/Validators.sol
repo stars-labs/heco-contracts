@@ -17,7 +17,7 @@ contract Validators is Params {
         Staked,
         // validator's staked coins < MinimalStakingCoin
         Unstaked,
-        // validator is jailed by system for too much miss(validator have to repropose)
+        // validator is jailed by system(validator have to repropose)
         Jailed
     }
 
@@ -53,10 +53,10 @@ contract Validators is Params {
     mapping(address => Validator) validatorInfo;
     // staker => validator => info
     mapping(address => mapping(address => StakingInfo)) staked;
-    // store current validator set used by chain
+    // current validator set used by chain
     // only changed at block epoch
     address[] public currentValidatorSet;
-    // store highest validator set(sort by staking, dynamic changed)
+    // highest validator set(dynamic changed)
     address[] public highestValidatorsSet;
     // total stake of all validators
     uint256 public totalStake;
@@ -67,7 +67,7 @@ contract Validators is Params {
     Proposal proposal;
     Punish punish;
 
-    enum Operations {Deposit, UpdateValidators}
+    enum Operations {Distribute, UpdateValidators}
     // Record the operations is done or not.
     mapping(uint256 => mapping(uint8 => bool)) operationsDone;
 
@@ -108,7 +108,11 @@ contract Validators is Params {
         uint256 hb,
         uint256 time
     );
-    event LogDepositBlockReward(address indexed val, uint256 hb, uint256 time);
+    event LogDistributeBlockReward(
+        address indexed coinbase,
+        uint256 blockReward,
+        uint256 time
+    );
     event LogUpdateValidator(address[] newSet);
     event LogStake(
         address indexed staker,
@@ -116,11 +120,10 @@ contract Validators is Params {
         uint256 staking,
         uint256 time
     );
-    event LogChangeDec(uint256 newMulti, uint256 newDivisor, uint256 time);
 
     modifier onlyNotReward() {
         require(
-            operationsDone[block.number][uint8(Operations.Deposit)] == false,
+            operationsDone[block.number][uint8(Operations.Distribute)] == false,
             "Block is already rewarded"
         );
         _;
@@ -378,10 +381,10 @@ contract Validators is Params {
             validatorInfo[validator].lastWithdrawProfitsBlock +
                 WithdrawProfitPeriod <=
                 block.number,
-            "You must wait enough to withdraw you profits after latest withdraw of this validator"
+            "You must wait enough blocks to withdraw your profits after latest withdraw of this validator"
         );
-
         uint256 hbIncoming = validatorInfo[validator].hbIncoming;
+        require(hbIncoming > 0, "You don't have any profits");
 
         // update info
         validatorInfo[validator].hbIncoming = 0;
@@ -402,15 +405,15 @@ contract Validators is Params {
         return true;
     }
 
-    // depositBlockReward block reward and gas fee to coin base
-    function depositBlockReward()
+    // distributeBlockReward distributes block reward to all active validators
+    function distributeBlockReward()
         external
         payable
         onlyMiner
         onlyNotReward
         onlyInitialized
     {
-        operationsDone[block.number][uint8(Operations.Deposit)] = true;
+        operationsDone[block.number][uint8(Operations.Distribute)] = true;
         address val = msg.sender;
         uint256 hb = msg.value;
 
@@ -420,9 +423,9 @@ contract Validators is Params {
         }
 
         // Jailed validator can't get profits.
-        addProfitsToActiveValidatorsByStakePercentExpect(hb, address(0));
+        addProfitsToActiveValidatorsByStakePercentExcept(hb, address(0));
 
-        emit LogDepositBlockReward(val, hb, block.timestamp);
+        emit LogDistributeBlockReward(val, hb, block.timestamp);
     }
 
     function updateActiveValidatorSet(address[] memory newSet, uint256 epoch)
@@ -435,7 +438,6 @@ contract Validators is Params {
         operationsDone[block.number][uint8(Operations.UpdateValidators)] = true;
         require(newSet.length > 0, "Validator set empty!");
 
-        // TODO: optimize
         uint256 l = currentValidatorSet.length;
         for (uint256 i = 0; i < l; i++) {
             currentValidatorSet.pop();
@@ -505,11 +507,6 @@ contract Validators is Params {
         )
     {
         Validator memory v = validatorInfo[val];
-        address[] memory stakers = new address[](v.stakers.length);
-
-        for (uint256 i = 0; i < stakers.length; i++) {
-            stakers[i] = v.stakers[i];
-        }
 
         return (
             v.feeAddr,
@@ -518,7 +515,7 @@ contract Validators is Params {
             v.hbIncoming,
             v.totalJailedHB,
             v.lastWithdrawProfitsBlock,
-            stakers
+            v.stakers
         );
     }
 
@@ -547,10 +544,10 @@ contract Validators is Params {
         view
         returns (uint256 total, uint256 len)
     {
-        return getTotalStakeOfActiveValidatorsExpect(address(0));
+        return getTotalStakeOfActiveValidatorsExcept(address(0));
     }
 
-    function getTotalStakeOfActiveValidatorsExpect(address val)
+    function getTotalStakeOfActiveValidatorsExcept(address val)
         private
         view
         returns (uint256 total, uint256 len)
@@ -658,7 +655,7 @@ contract Validators is Params {
         }
 
         uint256 hb = validatorInfo[val].hbIncoming;
-        addProfitsToActiveValidatorsByStakePercentExpect(hb, val);
+        addProfitsToActiveValidatorsByStakePercentExcept(hb, val);
         // for display purpose
         totalJailedHB = totalJailedHB.add(hb);
         validatorInfo[val].totalJailedHB = validatorInfo[val].totalJailedHB.add(
@@ -670,8 +667,8 @@ contract Validators is Params {
         emit LogRemoveValidatorIncoming(val, hb, block.timestamp);
     }
 
-    // add profits to all validators by stake percent expect the punished validator or jailed validator
-    function addProfitsToActiveValidatorsByStakePercentExpect(
+    // add profits to all validators by stake percent except the punished validator or jailed validator
+    function addProfitsToActiveValidatorsByStakePercentExcept(
         uint256 totalReward,
         address punishedVal
     ) private {
@@ -680,7 +677,7 @@ contract Validators is Params {
         (
             totalRewardStake,
             rewardValsLen
-        ) = getTotalStakeOfActiveValidatorsExpect(punishedVal);
+        ) = getTotalStakeOfActiveValidatorsExcept(punishedVal);
 
         if (rewardValsLen == 0) {
             return;

@@ -671,18 +671,18 @@ contract("Validators test", function (accounts) {
         })
     })
 
-    describe("deposit block reward and profits", async function () {
+    describe("distribute block reward", async function () {
         let fee = ether("0.3");
         let expectPerFee = ether("0.1");
-        it("miner can deposit to validator contract, the profits should be right updated", async function () {
-            let receipt = await valIns.depositBlockReward({
+        it("miner can distribute to validator contract, the profits should be right updated", async function () {
+            let receipt = await valIns.distributeBlockReward({
                 from: miner,
                 value: fee
             });
 
-            expectEvent(receipt, "LogDepositBlockReward", {
-                val: miner,
-                hb: fee,
+            expectEvent(receipt, "LogDistributeBlockReward", {
+                coinbase: miner,
+                blockReward: fee,
             })
 
             for (let i = 0; i < initValidators.length; i++) {
@@ -709,7 +709,7 @@ contract("Validators test", function (accounts) {
             await valIns.createOrEditValidator(feeAddr, "", "", "", "", "", {
                 from: miner
             });
-            await valIns.depositBlockReward({
+            await valIns.distributeBlockReward({
                 from: miner,
                 value: fee
             });
@@ -728,6 +728,20 @@ contract("Validators test", function (accounts) {
                 fee: feeAddr,
                 hb: expectFee,
             });
+        })
+
+        it("Can't call withdrawProfits if you don't have any profits", async function () {
+            feeAddr = accounts[10];
+
+            // advance block
+            let lock = await valIns.WithdrawProfitPeriod();
+            for (let i = 0; i < lock.toNumber(); i++) {
+                await time.advanceBlock();
+            }
+
+            await expectRevert(valIns.withdrawProfits(miner, {
+                from: feeAddr
+            }), "You don't have any profits");
         })
     })
 
@@ -805,8 +819,8 @@ contract("Punish", function (accounts) {
             let fee = ether("0.4");
 
             for (let i = 0; i < removeThreshold.toNumber(); i++) {
-                // deposit
-                await valIns.depositBlockReward({
+                // distribute
+                await valIns.distributeBlockReward({
                     from: miner,
                     value: fee
                 });

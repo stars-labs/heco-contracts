@@ -24,12 +24,12 @@ contract Punish is Params {
     event LogDecreaseMissedBlocksCounter();
     event LogPunishValidator(address indexed val, uint256 time);
 
-    modifier notPunish() {
+    modifier onlyNotPunish() {
         require(!punished[block.number], "Already punished");
         _;
     }
 
-    modifier notDecreased() {
+    modifier onlyNotDecreased() {
         require(!decreased[block.number], "Already decreased");
         _;
     }
@@ -52,7 +52,7 @@ contract Punish is Params {
         external
         onlyMiner
         onlyInitialized
-        notPunish
+        onlyNotPunish
         onlyZeroGasPrice
     {
         punished[block.number] = true;
@@ -79,7 +79,7 @@ contract Punish is Params {
     function decreaseMissedBlocksCounter(uint256 epoch)
         external
         onlyMiner
-        notDecreased
+        onlyNotDecreased
         onlyInitialized
         onlyBlockEpoch(epoch)
     {
