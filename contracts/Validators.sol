@@ -360,7 +360,7 @@ contract Validators is Params {
         stakingInfo.unstakeBlock = 0;
 
         // send stake back to staker
-        safeTransferHB(staker, staking);
+        staker.transfer(staking);
 
         emit LogWithdrawStaking(staker, validator, staking, block.timestamp);
         return true;
@@ -392,7 +392,7 @@ contract Validators is Params {
 
         // send profits to fee address
         if (hbIncoming > 0) {
-            safeTransferHB(feeAddr, hbIncoming);
+            feeAddr.transfer(hbIncoming);
         }
 
         emit LogWithdrawProfits(
@@ -749,12 +749,5 @@ contract Validators is Params {
                 break;
             }
         }
-    }
-
-    function safeTransferHB(address payable to, uint256 amount) internal {
-        if (amount > address(this).balance) {
-            amount = address(this).balance;
-        }
-        to.transfer(amount);
     }
 }
