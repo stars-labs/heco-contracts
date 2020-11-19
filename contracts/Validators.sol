@@ -438,14 +438,7 @@ contract Validators is Params {
         operationsDone[block.number][uint8(Operations.UpdateValidators)] = true;
         require(newSet.length > 0, "Validator set empty!");
 
-        uint256 l = currentValidatorSet.length;
-        for (uint256 i = 0; i < l; i++) {
-            currentValidatorSet.pop();
-        }
-
-        for (uint256 i = 0; i < newSet.length; i++) {
-            currentValidatorSet.push(newSet[i]);
-        }
+        currentValidatorSet = newSet;
 
         emit LogUpdateValidator(newSet);
     }

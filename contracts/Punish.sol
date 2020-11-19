@@ -35,11 +35,6 @@ contract Punish is Params {
         _;
     }
 
-    modifier onlyZeroGasPrice() {
-        require(tx.gasprice == 0, "Gasprice zero only");
-        _;
-    }
-
     function initialize() external onlyNotInitialized {
         validators = Validators(ValidatorContractAddr);
         punishThreshold = 10;
@@ -54,7 +49,6 @@ contract Punish is Params {
         onlyMiner
         onlyInitialized
         onlyNotPunished
-        onlyZeroGasPrice
     {
         punished[block.number] = true;
         if (!punishRecords[val].exist) {
@@ -64,13 +58,12 @@ contract Punish is Params {
         }
         punishRecords[val].missedBlocksCounter++;
 
-        if (punishRecords[val].missedBlocksCounter % removeThreshold == 0) {
+        if (punishRecords[val].missedBlocksCounter >= removeThreshold ) { 
             validators.removeValidator(val);
             // reset validator's missed blocks counter
             punishRecords[val].missedBlocksCounter = 0;
         } else if (
-            punishRecords[val].missedBlocksCounter % punishThreshold == 0
-        ) {
+            punishRecords[val].missedBlocksCounter >= punishThreshold ) {
             validators.removeValidatorIncoming(val);
         }
 
@@ -98,6 +91,8 @@ contract Punish is Params {
                     punishRecords[punishValidators[i]].missedBlocksCounter -
                     removeThreshold /
                     decreaseRate;
+            } else {
+                punishRecords[punishValidators[i]].missedBlocksCounter = 0;
             }
         }
 
