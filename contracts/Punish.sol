@@ -4,7 +4,6 @@ import "./Params.sol";
 import "./Validators.sol";
 
 contract Punish is Params {
-    uint256 public previousHeight;
     uint256 public punishThreshold;
     uint256 public removeThreshold;
     uint256 public decreaseRate;
@@ -15,16 +14,18 @@ contract Punish is Params {
         bool exist;
     }
 
-    mapping(address => PunishRecord) punishRecords;
-    mapping(uint256 => bool) punished;
-    address[] public punishValidators;
     Validators validators;
+
+    mapping(address => PunishRecord) punishRecords;
+    address[] public punishValidators;
+
+    mapping(uint256 => bool) punished;
     mapping(uint256 => bool) decreased;
 
     event LogDecreaseMissedBlocksCounter();
     event LogPunishValidator(address indexed val, uint256 time);
 
-    modifier onlyNotPunish() {
+    modifier onlyNotPunished() {
         require(!punished[block.number], "Already punished");
         _;
     }
@@ -52,7 +53,7 @@ contract Punish is Params {
         external
         onlyMiner
         onlyInitialized
-        onlyNotPunish
+        onlyNotPunished
         onlyZeroGasPrice
     {
         punished[block.number] = true;

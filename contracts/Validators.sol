@@ -121,7 +121,7 @@ contract Validators is Params {
         uint256 time
     );
 
-    modifier onlyNotReward() {
+    modifier onlyNotRewarded() {
         require(
             operationsDone[block.number][uint8(Operations.Distribute)] == false,
             "Block is already rewarded"
@@ -129,7 +129,7 @@ contract Validators is Params {
         _;
     }
 
-    modifier onlyNotUpdate() {
+    modifier onlyNotUpdated() {
         require(
             operationsDone[block.number][uint8(Operations.UpdateValidators)] ==
                 false,
@@ -410,7 +410,7 @@ contract Validators is Params {
         external
         payable
         onlyMiner
-        onlyNotReward
+        onlyNotRewarded
         onlyInitialized
     {
         operationsDone[block.number][uint8(Operations.Distribute)] = true;
@@ -431,7 +431,7 @@ contract Validators is Params {
     function updateActiveValidatorSet(address[] memory newSet, uint256 epoch)
         public
         onlyMiner
-        onlyNotUpdate
+        onlyNotUpdated
         onlyInitialized
         onlyBlockEpoch(epoch)
     {
