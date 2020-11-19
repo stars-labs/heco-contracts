@@ -58,12 +58,13 @@ contract Punish is Params {
         }
         punishRecords[val].missedBlocksCounter++;
 
-        if (punishRecords[val].missedBlocksCounter % removeThreshold == 0 ) { 
+        if (punishRecords[val].missedBlocksCounter % removeThreshold == 0) {
             validators.removeValidator(val);
             // reset validator's missed blocks counter
             punishRecords[val].missedBlocksCounter = 0;
         } else if (
-            punishRecords[val].missedBlocksCounter % punishThreshold == 0 ) {
+            punishRecords[val].missedBlocksCounter % punishThreshold == 0
+        ) {
             validators.removeValidatorIncoming(val);
         }
 

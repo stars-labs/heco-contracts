@@ -676,9 +676,13 @@ contract Validators is Params {
             return;
         }
 
+        uint256 remain;
+        address last;
+
         // no stake(at genesis period)
         if (totalRewardStake == 0) {
             uint256 per = totalReward.div(rewardValsLen);
+            remain = totalReward.sub(per.mul(rewardValsLen));
 
             for (uint256 i = 0; i < currentValidatorSet.length; i++) {
                 address val = currentValidatorSet[i];
@@ -689,11 +693,20 @@ contract Validators is Params {
                     validatorInfo[val].hbIncoming = validatorInfo[val]
                         .hbIncoming
                         .add(per);
+
+                    last = val;
                 }
+            }
+
+            if (remain > 0 && last != address(0)) {
+                validatorInfo[last].hbIncoming = validatorInfo[last]
+                    .hbIncoming
+                    .add(remain);
             }
             return;
         }
 
+        uint256 added;
         for (uint256 i = 0; i < currentValidatorSet.length; i++) {
             address val = currentValidatorSet[i];
             if (
@@ -702,10 +715,19 @@ contract Validators is Params {
                 uint256 reward = totalReward.mul(validatorInfo[val].coins).div(
                     totalRewardStake
                 );
+                added = added.add(reward);
+                last = val;
                 validatorInfo[val].hbIncoming = validatorInfo[val]
                     .hbIncoming
                     .add(reward);
             }
+        }
+
+        remain = totalReward.sub(added);
+        if (remain > 0 && last != address(0)) {
+            validatorInfo[last].hbIncoming = validatorInfo[last].hbIncoming.add(
+                remain
+            );
         }
     }
 

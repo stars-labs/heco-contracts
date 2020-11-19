@@ -139,7 +139,7 @@ contract("Proposal test", function (accounts) {
         })
 
         it("can't create a proposal for one who is pass proposal", async function () {
-            await expectRevert(proposalIns.createProposal(candidate, ""), "Dst passed, You can already start staking");
+            await expectRevert(proposalIns.createProposal(candidate, ""), "Dst already passed, You can start staking");
         })
     })
 

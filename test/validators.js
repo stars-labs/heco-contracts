@@ -884,6 +884,10 @@ contract("Punish", function (accounts) {
             assert.equal(l.toNumber(), 2);
 
             let expect = await punishIns.getPunishRecord(initValidators[0]);
+            // Punish record will be set to 0 if <= removeThreshold/decreaseRate 
+            if (expect.lte(removeThreshold.div(decreaseRate))) {
+                expect = new BN('0');
+            }
 
             // step to epoch
             let epoch = 30;
@@ -908,6 +912,10 @@ contract("Punish", function (accounts) {
 
         it("Can't stake to a jailed validator", async function () {
             let jailed = initValidators[0];
+
+            await punishIns.punish(jailed, {
+                from: miner
+            });
             let record = await punishIns.getPunishRecord(jailed);
             assert.equal(record.isZero(), false);
 
@@ -930,8 +938,6 @@ contract("Punish", function (accounts) {
             assert.equal(record.isZero(), false);
 
             await pass(proposalIns, initValidators, jailed);
-
-            // check status is crated
 
             // check record
             record = await punishIns.getPunishRecord(jailed);
