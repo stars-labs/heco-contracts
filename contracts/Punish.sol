@@ -4,7 +4,6 @@ import "./Params.sol";
 import "./Validators.sol";
 
 contract Punish is Params {
-    uint256 public previousHeight;
     uint256 public punishThreshold;
     uint256 public removeThreshold;
     uint256 public decreaseRate;
@@ -15,27 +14,24 @@ contract Punish is Params {
         bool exist;
     }
 
-    mapping(address => PunishRecord) punishRecords;
-    mapping(uint256 => bool) punished;
-    address[] public punishValidators;
     Validators validators;
+
+    mapping(address => PunishRecord) punishRecords;
+    address[] public punishValidators;
+
+    mapping(uint256 => bool) punished;
     mapping(uint256 => bool) decreased;
 
     event LogDecreaseMissedBlocksCounter();
     event LogPunishValidator(address indexed val, uint256 time);
 
-    modifier onlyNotPunish() {
+    modifier onlyNotPunished() {
         require(!punished[block.number], "Already punished");
         _;
     }
 
     modifier onlyNotDecreased() {
         require(!decreased[block.number], "Already decreased");
-        _;
-    }
-
-    modifier onlyZeroGasPrice() {
-        require(tx.gasprice == 0, "Gasprice zero only");
         _;
     }
 
@@ -52,8 +48,7 @@ contract Punish is Params {
         external
         onlyMiner
         onlyInitialized
-        onlyNotPunish
-        onlyZeroGasPrice
+        onlyNotPunished
     {
         punished[block.number] = true;
         if (!punishRecords[val].exist) {
@@ -63,13 +58,12 @@ contract Punish is Params {
         }
         punishRecords[val].missedBlocksCounter++;
 
-        if (punishRecords[val].missedBlocksCounter % removeThreshold == 0) {
+        if (punishRecords[val].missedBlocksCounter % removeThreshold == 0 ) { 
             validators.removeValidator(val);
             // reset validator's missed blocks counter
             punishRecords[val].missedBlocksCounter = 0;
         } else if (
-            punishRecords[val].missedBlocksCounter % punishThreshold == 0
-        ) {
+            punishRecords[val].missedBlocksCounter % punishThreshold == 0 ) {
             validators.removeValidatorIncoming(val);
         }
 
@@ -97,6 +91,8 @@ contract Punish is Params {
                     punishRecords[punishValidators[i]].missedBlocksCounter -
                     removeThreshold /
                     decreaseRate;
+            } else {
+                punishRecords[punishValidators[i]].missedBlocksCounter = 0;
             }
         }
 

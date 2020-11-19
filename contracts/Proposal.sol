@@ -86,7 +86,7 @@ contract Proposal is Params {
         external
         returns (bool)
     {
-        require(!pass[dst], "Dst passed, You can already start staking");
+        require(!pass[dst], "Dst already passed, You can start staking"); 
 
         // generate proposal id
         bytes32 id = keccak256(
