@@ -648,14 +648,16 @@ contract Validators is Params {
         }
 
         uint256 hb = validatorInfo[val].hbIncoming;
-        addProfitsToActiveValidatorsByStakePercentExcept(hb, val);
-        // for display purpose
-        totalJailedHB = totalJailedHB.add(hb);
-        validatorInfo[val].totalJailedHB = validatorInfo[val].totalJailedHB.add(
-            hb
-        );
+        if (hb > 0) {
+            addProfitsToActiveValidatorsByStakePercentExcept(hb, val);
+            // for display purpose
+            totalJailedHB = totalJailedHB.add(hb);
+            validatorInfo[val].totalJailedHB = validatorInfo[val]
+                .totalJailedHB
+                .add(hb);
 
-        validatorInfo[val].hbIncoming = 0;
+            validatorInfo[val].hbIncoming = 0;
+        }
 
         emit LogRemoveValidatorIncoming(val, hb, block.timestamp);
     }
@@ -665,6 +667,10 @@ contract Validators is Params {
         uint256 totalReward,
         address punishedVal
     ) private {
+        if (totalReward == 0) {
+            return;
+        }
+
         uint256 totalRewardStake;
         uint256 rewardValsLen;
         (
