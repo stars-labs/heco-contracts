@@ -14,9 +14,9 @@ contract Params {
     // System params
     uint16 public constant MaxValidators = 21;
     // Validator have to wait StakingLockPeriod blocks to withdraw staking
-    uint64 public constant StakingLockPeriod = 100;
+    uint64 public constant StakingLockPeriod = 86400;
     // Validator have to wait WithdrawProfitPeriod blocks to withdraw his profits
-    uint64 public constant WithdrawProfitPeriod = 100;
+    uint64 public constant WithdrawProfitPeriod = 28800;
     uint256 public constant MinimalStakingCoin = 32 ether;
 
     modifier onlyMiner() {
