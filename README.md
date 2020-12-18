@@ -1,4 +1,4 @@
-# hbsc-contracts
+# huobi-eco-contracts
 
 ## Prepare
 
