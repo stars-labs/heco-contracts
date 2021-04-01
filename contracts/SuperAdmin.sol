@@ -9,7 +9,7 @@ contract SuperAdmin is Params {
         address from;
         address to;
         uint value;
-        byte[] data;
+        bytes data;
     }
 
 
@@ -52,7 +52,7 @@ contract SuperAdmin is Params {
         emit AdminChanged(admin);
     }
 
-    function commitProposal(address from, address to, uint value, byte[] calldata input) external onlyAdmin {
+    function commitProposal(address from, address to, uint value, bytes calldata input) external onlyAdmin {
         uint id = proposals.length;
         Proposal memory p = Proposal(id, from, to, value, input);
 
@@ -71,7 +71,7 @@ contract SuperAdmin is Params {
         address from,
         address to,
         uint value,
-        byte[] memory data) {
+        bytes memory data) {
         require(id < proposals.length, "Id does not exist");
 
         Proposal memory p = proposals[id];
@@ -87,7 +87,7 @@ contract SuperAdmin is Params {
         address from,
         address to,
         uint value,
-        byte[] memory data) {
+        bytes memory data) {
         require(index < passedProposals.length, "Index out of range");
 
         Proposal memory p = passedProposals[index];
