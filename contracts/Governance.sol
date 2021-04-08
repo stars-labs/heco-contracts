@@ -2,7 +2,7 @@ pragma solidity >= 0.6.0 < 0.8.0;
 
 import "./Params.sol";
 
-contract SuperAdmin is Params {
+contract Governance is Params {
 
     struct Proposal {
         uint id;
