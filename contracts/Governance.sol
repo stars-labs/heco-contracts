@@ -1,3 +1,5 @@
+//SPDX-License-Identifier: MIT
+
 pragma solidity >= 0.6.0 < 0.8.0;
 
 import "./Params.sol";
@@ -6,6 +8,7 @@ contract Governance is Params {
 
     struct Proposal {
         uint id;
+        uint action;
         address from;
         address to;
         uint value;
@@ -52,9 +55,9 @@ contract Governance is Params {
         emit AdminChanged(admin);
     }
 
-    function commitProposal(address from, address to, uint value, bytes calldata input) external onlyAdmin {
+    function commitProposal(uint action, address from, address to, uint value, bytes calldata input) external onlyAdmin {
         uint id = proposals.length;
-        Proposal memory p = Proposal(id, from, to, value, input);
+        Proposal memory p = Proposal(id, action, from, to, value, input);
 
         proposals.push(p);
         passedProposals.push(p);
@@ -68,6 +71,7 @@ contract Governance is Params {
 
     function getProposalById(uint id) view external returns(
         uint _id,
+        uint action,
         address from,
         address to,
         uint value,
@@ -75,7 +79,7 @@ contract Governance is Params {
         require(id < proposals.length, "Id does not exist");
 
         Proposal memory p = proposals[id];
-        return (p.id, p.from, p.to, p.value, p.data);
+        return (p.id, p.action, p.from, p.to, p.value, p.data);
     }
 
     function getPassedProposalCount() view external returns(uint32) {
@@ -84,6 +88,7 @@ contract Governance is Params {
 
     function getPassedProposalByIndex(uint32 index) view external returns(
         uint id,
+        uint action,
         address from,
         address to,
         uint value,
@@ -91,7 +96,7 @@ contract Governance is Params {
         require(index < passedProposals.length, "Index out of range");
 
         Proposal memory p = passedProposals[index];
-        return (p.id, p.from, p.to, p.value, p.data);
+        return (p.id, p.action, p.from, p.to, p.value, p.data);
     }
 
     function finishProposalById(uint id) external onlyMiner {
