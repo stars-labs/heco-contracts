@@ -147,10 +147,10 @@ contract Candidate is Params {
     function updateReward() external payable {
         uint forCandidate = msg.value.mul(percent).div(100);
         reward += forCandidate;
-        accRewardPerShare = accRewardPerShare.add(msg.value.sub(forCandidate).mul(1e12).div(totalVote));
+        accRewardPerShare = accRewardPerShare.add(msg.value.sub(forCandidate).mul(1e18).div(totalVote));
 
         //TODO for test
-        require(reward + accRewardPerShare.mul(totalVote).div(1e12) <= address(this).balance, "Insufficent balance");
+        require(reward + accRewardPerShare.mul(totalVote).div(1e18) <= address(this).balance, "Insufficent balance");
     }
 
 
@@ -158,12 +158,12 @@ contract Candidate is Params {
         //take care of fallback
         pool.withdrawReward();
 
-        uint pendingReward = accRewardPerShare.mul(voters[msg.sender].amount).div(1e12).sub(voters[msg.sender].rewardDebt);
+        uint pendingReward = accRewardPerShare.mul(voters[msg.sender].amount).div(1e18).sub(voters[msg.sender].rewardDebt);
 
 
         voters[msg.sender].amount = voters[msg.sender].amount.add(msg.value);
         voters[msg.sender].lastVoteBlk = block.number;
-        voters[msg.sender].rewardDebt = voters[msg.sender].amount.mul(accRewardPerShare).div(1e12);
+        voters[msg.sender].rewardDebt = voters[msg.sender].amount.mul(accRewardPerShare).div(1e18);
 
         totalVote = totalVote.add(msg.value);
 
@@ -179,7 +179,7 @@ contract Candidate is Params {
     function removeVote() external {
         pool.withdrawReward();
 
-        uint pendingReward = accRewardPerShare.mul(voters[msg.sender].amount).div(1e12).sub(voters[msg.sender].rewardDebt);
+        uint pendingReward = accRewardPerShare.mul(voters[msg.sender].amount).div(1e18).sub(voters[msg.sender].rewardDebt);
 
         totalVote = totalVote.sub(voters[msg.sender].amount);
         uint amount = voters[msg.sender].amount + pendingReward;

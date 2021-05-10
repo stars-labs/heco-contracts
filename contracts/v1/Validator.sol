@@ -3,16 +3,15 @@ pragma solidity >=0.6.0 <0.8.0;
 
 import "../library/SafeMath.sol";
 import "./Candidate.sol";
+import "./Params.sol";
 
-contract Validator {
+contract Validator is Params {
     using SafeMath for uint;
 
     address public admin;
 
-    uint8 public  posCount;
-    uint8 public posBackup;
-    uint8 public poaCount;
-    uint8  public poaBackup;
+    mapping(Candidate.CandidateType => uint8) public count;
+    mapping(Candidate.CandidateType => uint8) public backupCount;
 
     address[] activeValidators;
     address[] backupValidators;
@@ -22,8 +21,6 @@ contract Validator {
     mapping(address => uint) public pendingReward;
 
     mapping(Candidate.CandidateType => LinkedList) topCandidates;
-    // LinkedList topPoaCandidates;
-    // LinkedList topPosCandidates;
 
 
     struct LinkedList {
@@ -47,6 +44,11 @@ contract Validator {
 
     function initialize(address _admin) external {
         admin = _admin;
+
+        count[Candidate.CandidateType.Pos] = 11;
+        count[Candidate.CandidateType.Poa] = 10;
+        backupCount[Candidate.CandidateType.Pos] = 11;
+        backupCount[Candidate.CandidateType.Poa] = 3;
     }
 
 
@@ -62,62 +64,68 @@ contract Validator {
 
 
     function getTopValidators() public view returns (address[] memory) {
+        uint8 _count = 0;
 
-        address[] memory topValidators = new address[](21);
-        uint8 index = 0;
+        Candidate.CandidateType[2] memory types = [Candidate.CandidateType.Pos, Candidate.CandidateType.Poa];
 
-        // //find out top 21
-        // uint8 size = posCount;
-        // address cur = topPosCandidates.head;
-        // while (size >= 0 && cur != address(0)) {
+        for(uint8 i=0; i < types.length; i++) {
+            Candidate.CandidateType _type = types[i];
+            LinkedList storage list = topCandidates[_type];
+            if(list.length < count[_type]) {
+                _count += list.length;
+            }else {
+                _count += count[_type];
+            }
+        }
 
-        //     topValidators[index] = Candidate(cur).miner();
-        //     index++;
-        //     size--;
-        //     cur = topPosCandidates.next[cur];
-        // }
+        address[] memory topValidators = new address[](_count);
 
-        // size = poaCount;
-        // cur = topPoaCandidates.head;
-        // while (size >= 0 && cur != address(0)) {
-        //     topValidators[index] = Candidate(cur).miner();
-        //     index++;
 
-        //     size--;
-        //     cur = topPoaCandidates.next[cur];
-        // }
+        for(uint8 i=0; i < types.length; i++) {
+            Candidate.CandidateType _type = types[i];
+            LinkedList storage list = topCandidates[_type];
+
+
+            uint8 size = count[_type];
+            address cur = list.head;
+            uint8 index = 0;
+            while (size > 0 && cur != address(0)) {
+
+                topValidators[index] = Candidate(cur).candidate();
+                index++;
+                size--;
+                cur = list.next[cur];
+            }
+        }
 
         return topValidators;
     }
 
+    mapping(address => uint8) actives;
     function updateActiveValidatorSet(address[] memory newSet, uint256 epoch)
         //TODO modifier
     public
     {
+        for(uint8 i = 0; i < activeValidators.length; i ++) {
+            actives[activeValidators[i]] = 0;
+        }
+
         activeValidators = newSet;
+        for(uint8 i = 0; i < activeValidators.length; i ++) {
+            actives[activeValidators[i]] = 1;
+        }
 
-        //TODO
-        // //find out backupValidators
-        // mapping(address => uint8) storage actives;
-        // for (uint8 i = 0; i < newSet.length; i++) {
-        //     actives[newSet[i]] = 1;
-        // }
-
-        // uint8 size = posBackup;
-        // Candidate cur = topPosCandidates.header;
-        // while (size >= 0 && cur.candidate != address(0) && actives[cur.candidate.miner()] == 0) {
-        //     backupValidators.push(cur.candidate.miner());
-        //     size--;
-        //     cur = topPosCandidates.next[cur];
-        // }
-
-        // size = poaBackup;
-        // cur = topPoaCandidates.header;
-        // while (size >= 0 && cur.candidate != address(0) && actives[cur.candidate.miner()] == 0) {
-        //     backupValidators.push(cur.candidate.miner());
-        //     size--;
-        //     cur = cur.next;
-        // }
+        Candidate.CandidateType[2] memory types = [Candidate.CandidateType.Pos, Candidate.CandidateType.Poa];
+        for(uint8 i=0; i < types.length; i++) {
+            uint8 size = backupCount[types[i]];
+            LinkedList storage topList = topCandidates[types[i]];
+            address cur = topList.head;
+            while (size >= 0 && cur != address(0) && actives[Candidate(cur).candidate()] == 0) {
+                backupValidators.push(Candidate(cur).candidate());
+                size--;
+                cur = topList.next[cur];
+            }
+        }
     }
 
     function distributeBlockReward()
@@ -156,36 +164,6 @@ contract Validator {
     function updateCandidateState(address _miner, Candidate.State state) external onlyAdmin {
         //TODO only idle pause
     }
-
-    function addNew(LinkedList storage l, Candidate c) internal {
-        if (l.length == 0) {
-            l.head = address(c);
-            l.tail = address(c);
-            l.length++;
-            return;
-        }
-
-        if (c.totalVote() < Candidate(l.tail).totalVote()) {
-            l.prev[address(c)] = l.tail;
-            l.next[l.tail] = address(c);
-            l.tail = address(c);
-            l.length++;
-            return;
-        }
-
-        address prev = l.tail;
-
-        while (prev != address(0)) {
-            if (prev == l.head) {
-                l.next[address(c)] = l.head;
-                l.prev[l.head] = address(c);
-                l.head = address(c);
-                l.length++;
-                return;
-            }
-        }
-    }
-
 
     function improveRanking() external onlyRegistered {
         Candidate c = Candidate(msg.sender);
@@ -250,6 +228,8 @@ contract Validator {
             curList.next[prev] = address(c);
             curList.prev[address(c)] = prev;
         }
+
+        //TODO remove tail > length ???
     }
 
     function lowerRanking() external onlyRegistered {
@@ -296,8 +276,31 @@ contract Validator {
     function removeRanking() external onlyRegistered {
         Candidate c = Candidate(msg.sender);
 
-         LinkedList storage curList = topCandidates[c.cType()];
+        LinkedList storage curList = topCandidates[c.cType()];
 
+        if(curList.head != address(c) && curList.prev[address(c)] == address(0)) {
+            //not in list
+            return;
+        }
+
+        if (curList.tail == address(c)) {
+            curList.tail = curList.prev[address(c)];
+        }
+
+        if(curList.head == address(c)) {
+            curList.head = curList.next[address(c)];
+        }
+
+        address next = curList.next[address(c)];
+        if(next != address(0)) {
+            curList.prev[next] = curList.prev[address(c)];
+        }
+        address prev = curList.prev[address(c)];
+        if(prev != address(0)) {
+            curList.next[prev] = curList.next[address(c)];
+        }
+
+        curList.prev[address(c)] = address(0);
+        curList.next[address(c)] = address(0);
     }
-
 }

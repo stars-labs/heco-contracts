@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity >=0.6.0 <0.8.0;
 
 contract Params {
@@ -19,7 +20,7 @@ contract Params {
     uint64 public constant WithdrawProfitPeriod = 28800;
     uint256 public constant MinimalStakingCoin = 32 ether;
 
-    uint public constant PosMinMargin = 5000 ether;
+    uint public constant PosMinMargin = 5 ether;
     uint public constant PoaMinMargin = 32 ether;
     uint public constant JailPeriod = 86400;
 
