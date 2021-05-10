@@ -20,7 +20,7 @@ contract Validator is Params {
 
     mapping(address => uint) public pendingReward;
 
-    mapping(Candidate.CandidateType => LinkedList) topCandidates;
+    mapping(Candidate.CandidateType => LinkedList) public topCandidates;
 
 
     struct LinkedList {
@@ -161,12 +161,14 @@ contract Validator is Params {
 
     }
 
-    function updateCandidateState(address _miner, Candidate.State state) external onlyAdmin {
-        //TODO only idle pause
+    function updateCandidateState(address _miner, bool pause) external onlyAdmin {
+        require(address(candidates[_miner]) != address(0), "Corresponding candidate not found");
+        candidates[_miner].switchState(pause);
     }
 
     function improveRanking() external onlyRegistered {
         Candidate c = Candidate(msg.sender);
+        require(c.state() == Candidate.State.Ready, "Incorrect state");
 
         //TODO check status check length
         LinkedList storage curList = topCandidates[c.cType()];
@@ -199,7 +201,7 @@ contract Validator is Params {
             prev = curList.tail;
         } else {
             //already exist
-            if (c.totalVote() < Candidate(prev).totalVote()) {
+            if (c.totalVote() <= Candidate(prev).totalVote()) {
                 return;
             }
 
@@ -229,20 +231,16 @@ contract Validator is Params {
             curList.prev[address(c)] = prev;
         }
 
-        //TODO remove tail > length ???
     }
 
     function lowerRanking() external onlyRegistered {
         Candidate c = Candidate(msg.sender);
+        require(c.state() == Candidate.State.Ready, "Incorrect state");
 
         LinkedList storage curList = topCandidates[c.cType()];
 
-        if (curList.tail == address(c)) {
-            return;
-        }
-
         address next = curList.next[address(c)];
-        if (Candidate(next).totalVote() < c.totalVote()) {
+        if (curList.tail == address(c) || next == address(0) || Candidate(next).totalVote() <= c.totalVote()) {
             return;
         }
 
@@ -302,5 +300,6 @@ contract Validator is Params {
 
         curList.prev[address(c)] = address(0);
         curList.next[address(c)] = address(0);
+        curList.length--;
     }
 }

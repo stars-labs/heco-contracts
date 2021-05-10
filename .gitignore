@@ -54,5 +54,6 @@ Thumbs.db
 *.mov
 *.wmv
 
+contracts/artifacts
 contracts/library/artifacts
 contracts/v1/artifacts

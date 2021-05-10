@@ -167,9 +167,7 @@ contract Candidate is Params {
 
         totalVote = totalVote.add(msg.value);
 
-        if (state == State.Ready) {
-            pool.improveRanking();
-        }
+        pool.improveRanking();
 
         if (pendingReward > 0) {
             msg.sender.transfer(pendingReward);
@@ -188,9 +186,7 @@ contract Candidate is Params {
         voters[msg.sender].lastVoteBlk = block.number;
         voters[msg.sender].rewardDebt = 0;
 
-        if (state == State.Ready) {
-            pool.lowerRanking();
-        }
+        pool.lowerRanking();
 
         if (amount > 0) {
             msg.sender.transfer(amount);
