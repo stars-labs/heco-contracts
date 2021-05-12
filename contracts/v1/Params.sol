@@ -49,13 +49,13 @@ contract Params {
         _;
     }
 
-    modifier onlyValidatorsContract() {
-        require(
-            msg.sender == ValidatorContractAddr,
-            "Validators contract only"
-        );
-        _;
-    }
+    // modifier onlyValidatorsContract() {
+    //     require(
+    //         msg.sender == ValidatorContractAddr,
+    //         "Validators contract only"
+    //     );
+    //     _;
+    // }
 
     modifier onlyProposalContract() {
         require(msg.sender == ProposalAddr, "Proposal contract only");

@@ -1,7 +1,7 @@
 const Validator = artifacts.require('Validator');
 const Candidate = artifacts.require('Candidate');
 
-const { web3 } = require('@openzeppelin/test-helpers/src/setup');
+const { web3, BN } = require('@openzeppelin/test-helpers/src/setup');
 const BigNumber = require('bignumber.js')
 
 const Pos = 0
@@ -89,4 +89,45 @@ contract("Single validator test", accounts => {
             )
         }
     })
+
+    it("change manager", async () => {
+        let candidate = await Candidate.at(await validator.candidates(accounts[0]))
+
+        assert.equal(await candidate.manager(), accounts[0], "old manager")
+        await candidate.changeManager(accounts[1], {from: accounts[0]})
+        assert.equal(await candidate.manager(), accounts[1], "new manager")
+
+    })
+
+    it("change percent", async () => {
+        let candidate = await Candidate.at(await validator.candidates(accounts[0]))
+
+        let percent = await candidate.percent();
+        try {
+            await  candidate.updatePercent(0, {from: accounts[0]});
+        }catch(e) {
+            assert(e.message.search('Only manager allowed') >= 0, 'from invalid account')
+        }
+
+        try {
+            await candidate.updatePercent(0, {from: accounts[1]});
+        }catch(e) {
+            assert(e.message.search('Invalid percent') >= 0, 'change percent to 0')
+        }
+
+        try {
+            await candidate.updatePercent(101, {from: accounts[1]});
+        }catch(e) {
+            assert(e.message.search('Invalid percent') >= 0, 'change percent to 101')
+        }
+
+        let tx = await  candidate.updatePercent(1, {from: accounts[1]});
+        assert.equal(tx.receipt.status, true, 'change percent to 1')
+
+        try {
+            await candidate.confirmPercentChange({from: accounts[1]});
+        }catch(e) {
+            assert(e.message.search('Interval not long enough') >= 0, 'confirm without wait')
+        }
+    }) 
 });

@@ -118,6 +118,7 @@ contract("Multi validators test", accounts => {
         }
     })
 
+
     it("vote to change ranking", async () => {
 
         //accounts vote for self
@@ -159,9 +160,17 @@ contract("Multi validators test", accounts => {
 
             i ++
         }
-
-
     })
 
-
+    it("remove from list", async() => {
+        let tops = await validator.getTopValidators()
+        while(tops.length > 0) {
+            await validator.updateCandidateState(tops[0], true)
+            let topNew = await validator.getTopValidators()
+            if(topNew.length > 0) {
+                assert.equal(topNew[0], tops[1], "new head")
+            }
+            tops = topNew
+        }
+    })
 });
