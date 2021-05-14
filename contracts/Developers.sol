@@ -5,10 +5,13 @@ pragma solidity >= 0.6.0 < 0.8.0;
 // Developers manages the developer addresses
 contract Developers {
     bool public initialized;
+    bool public enabled;
     address public admin;
     address public pendingAdmin;
 
     mapping(address => bool) private devs;
+
+    event EnableStateChanged(bool indexed newState);
 
     event AdminChanging(address indexed newAdmin);
     event AdminChanged(address indexed newAdmin);
@@ -29,6 +32,12 @@ contract Developers {
     function initialize(address _admin) external onlyNotInitialized {
         admin = _admin;
         initialized = true;
+    }
+
+    function changeEnable(bool _isEnabled) external onlyAdmin {
+        require(enabled != _isEnabled, "Same value");
+        enabled = _isEnabled;
+        emit EnableStateChanged(_isEnabled);
     }
 
     function commitChangeAdmin(address newAdmin) external onlyAdmin {
