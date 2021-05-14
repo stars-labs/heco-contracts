@@ -12,126 +12,129 @@ library SortedLinkedList {
         mapping(ICandidate => ICandidate) next;
     }
 
-    function improveRanking(List storage curList, ICandidate c) internal {
+    function improveRanking(List storage _list, ICandidate _value)
+    internal {
         //insert new
-        if (curList.length == 0) {
-            curList.head = c;
-            curList.tail = c;
-            curList.length++;
+        if (_list.length == 0) {
+            _list.head = _value;
+            _list.tail = _value;
+            _list.length++;
             return;
         }
 
         //already first
-        if (curList.head == c) {
+        if (_list.head == _value) {
             return;
         }
 
-        ICandidate prev = curList.prev[c];
+        ICandidate _prev = _list.prev[_value];
         // not in list
-        if (prev == ICandidate(0)) {
+        if (_prev == ICandidate(0)) {
             //insert new
-            curList.length++;
+            _list.length++;
 
-            if (c.totalVote() <= curList.tail.totalVote()) {
-                curList.prev[c] = curList.tail;
-                curList.next[curList.tail] = c;
-                curList.tail = c;
+            if (_value.totalVote() <= _list.tail.totalVote()) {
+                _list.prev[_value] = _list.tail;
+                _list.next[_list.tail] = _value;
+                _list.tail = _value;
 
                 return;
             }
 
-            prev = curList.tail;
+            _prev = _list.tail;
         } else {
-            if (c.totalVote() <= prev.totalVote()) {
+            if (_value.totalVote() <= _prev.totalVote()) {
                 return;
             }
 
             //remove from list
-            curList.next[prev] = curList.next[c];
-            if (c == curList.tail) {
-                curList.tail = prev;
+            _list.next[_prev] = _list.next[_value];
+            if (_value == _list.tail) {
+                _list.tail = _prev;
             } else {
-                curList.prev[curList.next[c]] = curList.prev[c];
+                _list.prev[_list.next[_value]] = _list.prev[_value];
             }
         }
 
-        while (prev != ICandidate(0) && c.totalVote() > prev.totalVote()) {
-            prev = curList.prev[prev];
+        while (_prev != ICandidate(0) && _value.totalVote() > _prev.totalVote()) {
+            _prev = _list.prev[_prev];
         }
 
-        if (prev == ICandidate(0)) {
-            curList.next[c] = curList.head;
-            curList.prev[curList.head] = c;
-            curList.prev[c] = ICandidate(0);
-            curList.head = c;
+        if (_prev == ICandidate(0)) {
+            _list.next[_value] = _list.head;
+            _list.prev[_list.head] = _value;
+            _list.prev[_value] = ICandidate(0);
+            _list.head = _value;
             return;
         } else {
-            curList.next[c] = curList.next[prev];
-            curList.prev[curList.next[prev]] = c;
-            curList.next[prev] = c;
-            curList.prev[c] = prev;
+            _list.next[_value] = _list.next[_prev];
+            _list.prev[_list.next[_prev]] = _value;
+            _list.next[_prev] = _value;
+            _list.prev[_value] = _prev;
         }
     }
 
 
-    function lowerRanking(List storage curList, ICandidate c) internal {
-        ICandidate next = curList.next[c];
-        if (curList.tail == c || next == ICandidate(0) || next.totalVote() <= c.totalVote()) {
+    function lowerRanking(List storage _list, ICandidate _value)
+    internal {
+        ICandidate _next = _list.next[_value];
+        if (_list.tail == _value || _next == ICandidate(0) || _next.totalVote() <= _value.totalVote()) {
             return;
         }
 
         //remove it
-        curList.prev[next] = curList.prev[c];
-        if (curList.head == c) {
-            curList.head = next;
+        _list.prev[_next] = _list.prev[_value];
+        if (_list.head == _value) {
+            _list.head = _next;
         } else {
-            curList.next[curList.prev[c]] = next;
+            _list.next[_list.prev[_value]] = _next;
         }
 
-        while (next != ICandidate(0) && next.totalVote() > c.totalVote()) {
-            next = curList.next[next];
+        while (_next != ICandidate(0) && _next.totalVote() > _value.totalVote()) {
+            _next = _list.next[_next];
         }
 
-        if (next == ICandidate(0)) {
-            curList.prev[c] = curList.tail;
-            curList.next[c] = ICandidate(0);
+        if (_next == ICandidate(0)) {
+            _list.prev[_value] = _list.tail;
+            _list.next[_value] = ICandidate(0);
 
-            curList.next[curList.tail] = c;
-            curList.tail = c;
+            _list.next[_list.tail] = _value;
+            _list.tail = _value;
         } else {
-            curList.next[curList.prev[next]] = c;
-            curList.prev[c] = curList.prev[next];
-            curList.next[c] = next;
-            curList.prev[next] = c;
+            _list.next[_list.prev[_next]] = _value;
+            _list.prev[_value] = _list.prev[_next];
+            _list.next[_value] = _next;
+            _list.prev[_next] = _value;
         }
     }
 
 
-    function removeRanking(List storage curList, ICandidate c) internal {
-        if(curList.head != c && curList.prev[c] == ICandidate(0)) {
+    function removeRanking(List storage _list, ICandidate _value)
+    internal {
+        if (_list.head != _value && _list.prev[_value] == ICandidate(0)) {
             //not in list
             return;
         }
 
-        if (curList.tail == c) {
-            curList.tail = curList.prev[c];
+        if (_list.tail == _value) {
+            _list.tail = _list.prev[_value];
         }
 
-        if(curList.head == c) {
-            curList.head = curList.next[c];
+        if (_list.head == _value) {
+            _list.head = _list.next[_value];
         }
 
-        ICandidate next = curList.next[c];
-        if(next != ICandidate(0)) {
-            curList.prev[next] = curList.prev[c];
+        ICandidate _next = _list.next[_value];
+        if (_next != ICandidate(0)) {
+            _list.prev[_next] = _list.prev[_value];
         }
-        ICandidate prev = curList.prev[c];
-        if(prev != ICandidate(0)) {
-            curList.next[prev] = curList.next[c];
+        ICandidate _prev = _list.prev[_value];
+        if (_prev != ICandidate(0)) {
+            _list.next[_prev] = _list.next[_value];
         }
 
-        curList.prev[c] = ICandidate(0);
-        curList.next[c] = ICandidate(0);
-        curList.length--;
+        _list.prev[_value] = ICandidate(0);
+        _list.next[_value] = ICandidate(0);
+        _list.length--;
     }
 }

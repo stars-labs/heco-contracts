@@ -56,9 +56,4 @@ contract Params {
     //     );
     //     _;
     // }
-
-    modifier onlyProposalContract() {
-        require(msg.sender == ProposalAddr, "Proposal contract only");
-        _;
-    }
 }
