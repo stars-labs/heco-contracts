@@ -104,7 +104,7 @@ contract Validator is Params {
 
     function updateActiveValidatorSet(address[] memory newSet, uint256 epoch)
         //TODO modifier
-    public
+    external
     {
         for (uint8 i = 0; i < activeValidators.length; i ++) {
             actives[activeValidators[i]] = 0;
@@ -115,14 +115,21 @@ contract Validator is Params {
             actives[activeValidators[i]] = 1;
         }
 
+
+        for(uint8 i = 0; i < backupValidators.length; i ++) {
+            delete backupValidators[backupValidators.length - 1];
+        }
+
         CandidateType[2] memory types = [CandidateType.Pos, CandidateType.Poa];
         for (uint8 i = 0; i < types.length; i++) {
             uint8 size = backupCount[types[i]];
             SortedLinkedList.List storage topList = topCandidates[types[i]];
             ICandidate cur = topList.head;
-            while (size >= 0 && cur != ICandidate(0) && actives[cur.candidate()] == 0) {
-                backupValidators.push(cur.candidate());
-                size--;
+            while (size >= 0 && cur != ICandidate(0)) {
+                if(actives[cur.candidate()] == 0) {
+                    backupValidators.push(cur.candidate());
+                    size--;
+                }
                 cur = topList.next[cur];
             }
         }
@@ -133,72 +140,82 @@ contract Validator is Params {
     payable
     {
         //TODO
-        uint total = 0;
+        uint _total = 0;
         for (uint8 i = 0; i < activeValidators.length; i++) {
-            total += candidates[activeValidators[i]].totalVote();
+            _total += candidates[activeValidators[i]].totalVote();
         }
 
-        if (total > 0) {
+        if (_total > 0) {
             for (uint8 i = 0; i < activeValidators.length; i++) {
                 ICandidate c = candidates[activeValidators[i]];
-                pendingReward[address(c)] += c.totalVote().mul(msg.value).div(total);
+                pendingReward[address(c)] += c.totalVote().mul(msg.value).div(_total);
             }
         }
     }
 
     function withdrawReward()
     external {
-        uint amount = pendingReward[msg.sender];
-        if (amount == 0) {
+        uint _amount = pendingReward[msg.sender];
+        if (_amount == 0) {
             return;
         }
 
         pendingReward[msg.sender] = 0;
-        Candidate(msg.sender).updateReward{value : amount}();
+        Candidate(msg.sender).updateReward{value : _amount}();
     }
 
-    //TODO change admin
+    function changeAdmin(address _newAdmin)
+    external
+    onlyAdmin {
+        admin = _newAdmin;
+    }
 
     function updateParams(uint8 _posCount, uint8 _posBackup, uint8 _poaCount, uint8 _poaBackup)
     external
     onlyAdmin {
+        require(_posCount + _poaCount == 21, "Invalid params");
 
+        count[CandidateType.Pos] = _posCount;
+        count[CandidateType.Poa] = _poaCount;
+
+        backupCount[CandidateType.Pos] = _posBackup;
+        backupCount[CandidateType.Pos] = _poaBackup;
     }
 
-    function updateCandidateState(address _miner, bool pause)
+    function updateCandidateState(address _candidate, bool pause)
     external
     onlyAdmin {
-        require(address(candidates[_miner]) != address(0), "Corresponding candidate not found");
-        candidates[_miner].switchState(pause);
+        require(address(candidates[_candidate]) != address(0), "Corresponding candidate not found");
+        candidates[_candidate].switchState(pause);
     }
 
     function improveRanking()
     external
     onlyRegistered {
-        Candidate c = Candidate(msg.sender);
-        require(c.state() == State.Ready, "Incorrect state");
+        ICandidate _candidate = ICandidate(msg.sender);
+        require(_candidate.state() == State.Ready, "Incorrect state");
 
-        SortedLinkedList.List storage curList = topCandidates[c.cType()];
-        curList.improveRanking(ICandidate(msg.sender));
+        SortedLinkedList.List storage _list = topCandidates[_candidate.cType()];
+        _list.improveRanking(ICandidate(msg.sender));
     }
 
     function lowerRanking()
     external
     onlyRegistered {
-        Candidate c = Candidate(msg.sender);
-        require(c.state() == State.Ready, "Incorrect state");
+        ICandidate _candidate = ICandidate(msg.sender);
+        require(_candidate.state() == State.Ready, "Incorrect state");
 
-        SortedLinkedList.List storage curList = topCandidates[c.cType()];
-        curList.lowerRanking(ICandidate(msg.sender));
+        SortedLinkedList.List storage _list = topCandidates[_candidate.cType()];
+        _list.lowerRanking(_candidate);
     }
 
 
     function removeRanking()
     external
     onlyRegistered {
-        Candidate c = Candidate(msg.sender);
+        ICandidate _candidate = ICandidate(msg.sender);
 
-        SortedLinkedList.List storage curList = topCandidates[c.cType()];
-        curList.removeRanking(ICandidate(msg.sender));
+        SortedLinkedList.List storage _list = topCandidates[_candidate.cType()];
+        _list.removeRanking(_candidate);
     }
 }
