@@ -6,6 +6,8 @@ const prodConfig = {
     PoaMinMargin : 1,
     JailPeriod : 86400,
     LockPeriod : 86400,
+    ValidatorContractAddr: '0x000000000000000000000000000000000000f000',
+    PunishContractAddr: '0x000000000000000000000000000000000000F001',
 }
 
 const devConfig = {
@@ -13,6 +15,8 @@ const devConfig = {
     PoaMinMargin : 1,
     JailPeriod : 8,
     LockPeriod : 0,
+    ValidatorContractAddr: '0x000000000000000000000000000000000000f000',
+    PunishContractAddr: '0x000000000000000000000000000000000000F001',
 }
 
 const contractDefs = {
@@ -35,7 +39,7 @@ module.exports = {
   },
   networks: {
     env: {
-      url: 'http://localhsot:7545' //process.env.RPC_URL
+      url: 'http://localhsot:8545' //process.env.RPC_URL
     }
   }
 };
