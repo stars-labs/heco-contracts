@@ -6,6 +6,7 @@ interface ICandidate {
     function totalVote() external view returns(uint);
     function candidate() external view returns(address);
     function switchState(bool pause) external;
+    function punish() external;
 }
 
 enum CandidateType {

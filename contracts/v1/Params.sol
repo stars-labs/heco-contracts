@@ -6,18 +6,12 @@ contract Params {
 
     // System contracts
     address
-        public constant ValidatorContractAddr = 0x000000000000000000000000000000000000f000;
+        public constant ValidatorContractAddr = $(ValidatorContractAddr);
     address
-        public constant PunishContractAddr = 0x000000000000000000000000000000000000F001;
-    address
-        public constant ProposalAddr = 0x000000000000000000000000000000000000F002;
+        public constant PunishContractAddr = $(PunishContractAddr);
 
     // System params
     uint16 public constant MaxValidators = 21;
-    // Validator have to wait StakingLockPeriod blocks to withdraw staking
-    // Validator have to wait WithdrawProfitPeriod blocks to withdraw his profits
-    uint64 public constant WithdrawProfitPeriod = 28800;
-    uint256 public constant MinimalStakingCoin = 32 ether;
 
     uint public constant PosMinMargin = $(PosMinMargin) ether;
     uint public constant PoaMinMargin = $(PoaMinMargin) ether;

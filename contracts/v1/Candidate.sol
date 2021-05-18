@@ -5,11 +5,13 @@ import "./Params.sol";
 import "../library/SafeMath.sol";
 import "./interfaces/ICandidate.sol";
 import "./interfaces/IValidator.sol";
+import "./interfaces/IPunish.sol";
 
 contract Candidate is Params {
     using SafeMath for uint;
 
     IValidator pool;
+    IPunish punishContract;
 
     CandidateType public cType;
 
@@ -88,6 +90,8 @@ contract Candidate is Params {
 //TODO    onlyValidatorsContract
     onlyValidPercent(_percent) {
         pool = IValidator(msg.sender);
+        punishContract = IPunish(PunishContractAddr);
+
         candidate = _miner;
         manager = _manager;
         percent = _percent;
@@ -146,6 +150,7 @@ contract Candidate is Params {
 
         if (margin >= minMargin) {
             state = State.Ready;
+            punishContract.cleanPunishRecord(candidate);
             emit ChangeState(state);
         }
     }
