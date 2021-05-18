@@ -26,6 +26,10 @@ contract Validator is Params {
 
     mapping(CandidateType => SortedLinkedList.List) public topCandidates;
 
+    event ChangeAdmin(address indexed admin);
+    event UpdateParams(uint8 posCount, uint8 posBackup, uint8 poaCount, uint8 poaBackup);
+    event AddCandidate(address indexed candidate, address contractAddress);
+
     modifier onlyAdmin() {
         require(msg.sender == admin, "Only admin");
         _;
@@ -48,7 +52,28 @@ contract Validator is Params {
         backupCount[CandidateType.Poa] = 3;
     }
 
-    function addValidator(address _candidate, address _manager, uint8 _percent, CandidateType _type)
+    function changeAdmin(address _newAdmin)
+    external
+    onlyAdmin {
+        admin = _newAdmin;
+        emit ChangeAdmin(admin);
+    }
+
+    function updateParams(uint8 _posCount, uint8 _posBackup, uint8 _poaCount, uint8 _poaBackup)
+    external
+    onlyAdmin {
+        require(_posCount + _poaCount == MaxValidators, "Invalid params");
+
+        count[CandidateType.Pos] = _posCount;
+        count[CandidateType.Poa] = _poaCount;
+
+        backupCount[CandidateType.Pos] = _posBackup;
+        backupCount[CandidateType.Poa] = _poaBackup;
+
+        emit UpdateParams(_posCount, _posBackup, _poaCount, _poaBackup);
+    }
+
+    function addCandidate(address _candidate, address _manager, uint8 _percent, CandidateType _type)
     external
     onlyAdmin
     returns (address) {
@@ -57,8 +82,16 @@ contract Validator is Params {
         Candidate _candidateContract = new Candidate(_candidate, _manager, _percent, _type);
         candidates[_candidate] = ICandidate(address(_candidateContract));
 
-        //TODO event
+        emit AddCandidate(_candidate, address(_candidateContract));
+
         return address(_candidateContract);
+    }
+
+    function updateCandidateState(address _candidate, bool pause)
+    external
+    onlyAdmin {
+        require(address(candidates[_candidate]) != address(0), "Corresponding candidate not found");
+        candidates[_candidate].switchState(pause);
     }
 
     function getTopValidators()
@@ -164,31 +197,6 @@ contract Validator is Params {
         Candidate(msg.sender).updateReward{value : _amount}();
     }
 
-    function changeAdmin(address _newAdmin)
-    external
-    onlyAdmin {
-        admin = _newAdmin;
-    }
-
-    function updateParams(uint8 _posCount, uint8 _posBackup, uint8 _poaCount, uint8 _poaBackup)
-    external
-    onlyAdmin {
-        require(_posCount + _poaCount == 21, "Invalid params");
-
-        count[CandidateType.Pos] = _posCount;
-        count[CandidateType.Poa] = _poaCount;
-
-        backupCount[CandidateType.Pos] = _posBackup;
-        backupCount[CandidateType.Pos] = _poaBackup;
-    }
-
-    function updateCandidateState(address _candidate, bool pause)
-    external
-    onlyAdmin {
-        require(address(candidates[_candidate]) != address(0), "Corresponding candidate not found");
-        candidates[_candidate].switchState(pause);
-    }
-
     function improveRanking()
     external
     onlyRegistered {
@@ -208,7 +216,6 @@ contract Validator is Params {
         SortedLinkedList.List storage _list = topCandidates[_candidate.cType()];
         _list.lowerRanking(_candidate);
     }
-
 
     function removeRanking()
     external

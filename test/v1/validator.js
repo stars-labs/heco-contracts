@@ -1,13 +1,13 @@
 const Validator = artifacts.require('Validator');
-const Candidate = artifacts.require('Candidate');
+const Candidate = artifacts.require('MockCandidate');
 
-const { web3 } = require('@openzeppelin/test-helpers/src/setup');
-const BigNumber = require('bignumber.js')
+const { assert } = require('hardhat');
+const truffleAssert = require('truffle-assertions')
 
 const Pos = 0
 const Poa = 1
 
-contract("Multi validators test", accounts => {
+contract("Validator test", accounts => {
     let validator;
 
     before('deploy validator', async() => {
@@ -15,162 +15,83 @@ contract("Multi validators test", accounts => {
     } )
 
     before('add admin', async() => {
-        await validator.initialize(accounts[0])
+        await validator.initialize(accounts[1])
+        assert.equal(await validator.admin(), accounts[1])
+    })
+
+    it('only admin', async() => {
+        let inputs = [
+            ['changeAdmin', [accounts[0]]],
+            ['updateParams', [11,10,10,11]],
+            ['addCandidate', [accounts[0], accounts[0], 20, Pos]],
+            ['updateCandidateState', [accounts[0], true]]
+        ]
+
+        for(let input of inputs) {
+            try {
+                await validator[input[0]](...input[1], {from: accounts[0]})
+            }catch (e) {
+                assert(e.message.search('Only admin') >= 0, input[0])
+            }
+        }
+    })
+
+    it('change admin', async() => {
+        let tx = await validator.changeAdmin(accounts[0], {from: accounts[1]})
+        truffleAssert.eventEmitted(tx, 'ChangeAdmin', {admin: accounts[0]})
         assert.equal(await validator.admin(), accounts[0])
     })
-    
-    it("add candidates", async ()=>{
-        let max = parseInt(await validator.count(Pos))
-        for(let i =0; i < accounts.length; i++) {
-            max--
-            if(max < 0) {
-                break
-            }
 
-            await validator.addValidator(accounts[i], accounts[i], 20, 0, {
-                from: accounts[0],
-                gas: 2000000
-            })
-            let candidate = await Candidate.at(await validator.candidates(accounts[i]))
-            assert.equal(await candidate.state(), 0)
+    it('change params', async() => {
+        //params incorrect
+        try {
+            await validator.updateParams(1, 1, 1, 1, {from: accounts[0]})
+        }catch (e) {
+            assert(e.message.search('Invalid params') >= 0, 'invalid params')
         }
+
+        let tx = await validator.updateParams(21,10, 0, 11, {from: accounts[0]})
+      
+        truffleAssert.eventEmitted(tx, 'UpdateParams', ev => ev.posCount.toNumber() === 21 
+        && ev.posBackup.toNumber() === 10
+        && ev.poaCount.toNumber() === 0
+        && ev.poaBackup.toNumber() === 11)
+
+        assert.equal((await validator.count(Pos)).toNumber(), 21, 'pos count')
+        assert.equal((await validator.count(Poa)).toNumber(), 0, 'poa count')
+        assert.equal((await validator.backupCount(Pos)).toNumber(), 10, 'pos backup count')
+        assert.equal((await validator.backupCount(Poa)).toNumber(), 11, 'poa backup count')
     })
 
-    it("add margin", async() => {
-        let max = parseInt(await validator.count(Pos))
-        for(let i = 0; i < accounts.length; i++) {
-            max--
-            if(max < 0) {
-                break
-            }
-
-            let candidate = await Candidate.at(await validator.candidates(accounts[i]))
-            await candidate.addMargin({
-                from: accounts[i],
-                value: web3.utils.toWei("10", "ether")
-            })
-
-            assert.equal(await candidate.state(), 1)
-        }        
-   })
-
-    it("add vote", async() => {
-        let max = parseInt(await validator.count(Pos))
-        for(let i =0; i < accounts.length; i++) {
-            max--
-            if(max < 0) {
-                break
-            }
-
-            let candidate = await Candidate.at(await validator.candidates(accounts[i]))
-            let tx = await candidate.addVote({from: accounts[i], value: web3.utils.toWei(`${1+ 1 * i}`, "ether")})
-            console.log(`tx gas used:${tx.receipt.gasUsed}`)
-            assert.isOk(tx.receipt.status, "add vote failed")
-        }
-
-
+    it("get top validators" , async () => {
+        let vals = await validator.getTopValidators()
+        assert.equal(vals.length, 0, 'validator length')
     })
 
-    it("top candidates", async() => {
-        
-        let tops = await validator.getTopValidators()
-        assert.equal(await validator.count(Pos), tops.length)
+    it("add candidate", async ()=>{
+        let tx = await validator.addCandidate(accounts[0], accounts[0], 10, Pos, {
+            from: accounts[0],
+            gas: 2000000
+        })
 
-        for(let i =0; i < tops.length; i++) {
-            assert.equal(tops[i], accounts[tops.length - i - 1], `index ${i} not equal`)
-        }
+        truffleAssert.eventEmitted(tx, 'AddCandidate', {candidate: accounts[0], contractAddress: await validator.candidates(accounts[0])})
 
-        await validator.updateActiveValidatorSet(tops, 0)
+        assert(tx.receipt.status)
     })
 
-    it("reward with multi candidates", async() => {
-        await validator.distributeBlockReward({from: accounts[0], gas: 400000, value: web3.utils.toWei("100", "ether")})
-        assert.equal(web3.utils.toWei("100", "ether"), await web3.eth.getBalance(validator.address))
-
-        let max = parseInt(await validator.count(Pos))
-        let total = (1 + max) * max / 2;
-
-        for(let i =0; i < accounts.length; i++) {
-            max--
-            if(max < 0) {
-                break
-            }
-
-            assert.equal(web3.utils.toWei(`${new BigNumber(i+1).times(100).div(total).toFixed(18, BigNumber.BigNumber.ROUND_DOWN)}`, "ether"), 
-            (await validator.pendingReward(await validator.candidates(accounts[i]))).toString(),
-            `address:${accounts[i]}`)
+    it('only registered', async () => {
+        let c = await Candidate.new(accounts[0], accounts[0], 0, 1)        
+        await c.changeVote(50)
+        try {
+            await c.changeVoteAndRanking(await validator.address, 100)
+        }catch(e) {
+            assert(e.message.search('Candidate not registered') >= 0)
         }
 
-        max = parseInt(await validator.count(Pos))
-        for(let i =0; i < accounts.length; i++) {
-            max--
-            if(max < 0) {
-                break
-            }
-
-            // let topCandidates =  await validator.topCandidates(Pos)
-            // console.log(`head:${await (await Candidate.at(topCandidates.head)).candidate()}, tail:${await (await Candidate.at(topCandidates.tail)).candidate()}`)
-            // console.log(await validator.getTopValidators())
-            let candidate = await Candidate.at(await validator.candidates(accounts[i]))
-            let tx = await candidate.removeVote({from: accounts[i]})
-            console.log(`tx gas used:${tx.receipt.gasUsed}`)
-            assert.isOk(tx.receipt.status, "remove vote failed")
-        }
-    })
-
-
-    it("vote to change ranking", async () => {
-
-        //accounts vote for self
-        let i = await validator.count(Pos) - 1
-        while(i >=0 ) {
-            let account = accounts[i]
-
-            let candidate = await Candidate.at(await validator.candidates(accounts[i]))
-            let tx = await candidate.addVote({from: accounts[i], value: web3.utils.toWei(`${accounts.length - i}`, "ether")})
-            console.log(`tx gas used:${tx.receipt.gasUsed}`)
-            assert.isOk(tx.receipt.status, "add vote failed")
-
-            // let topCandidates =  await validator.topCandidates(Pos)
-            // console.log(`head:${await (await Candidate.at(topCandidates.head)).candidate()}, tail:${await (await Candidate.at(topCandidates.tail)).candidate()}`)
-            // console.log(await validator.getTopValidators())
-
-            let tops = await validator.getTopValidators()
-            assert.equal(tops[0], account, `account:${account}`)
-
-            i --
-        }
-
-        //remove from top0
-        i = 0
-        while(i <= await validator.count(Pos) - 1) {
-            let account = accounts[i]
-
-            let candidate = await Candidate.at(await validator.candidates(accounts[i]))
-            let tx = await candidate.removeVote({from: accounts[i]})
-            console.log(`tx gas used:${tx.receipt.gasUsed}`)
-            assert.isOk(tx.receipt.status, "remove vote failed")
-
-            let tops = await validator.getTopValidators()
-            if(i < await validator.count(Pos) - 1) {
-                assert.equal(tops[0], accounts[i+1], `index:${i} account:${account}`)
-            }else {
-                assert.equal(tops[0], account, `index:${i} account:${account}`)
-            }
-
-            i ++
-        }
-    })
-
-    it("remove from list", async() => {
-        let tops = await validator.getTopValidators()
-        while(tops.length > 0) {
-            await validator.updateCandidateState(tops[0], true)
-            let topNew = await validator.getTopValidators()
-            if(topNew.length > 0) {
-                assert.equal(topNew[0], tops[1], "new head")
-            }
-            tops = topNew
+        try {
+            await c.changeVoteAndRanking(await validator.address, 0)
+        }catch(e) {
+            assert(e.message.search('Candidate not registered') >= 0)
         }
     })
 });

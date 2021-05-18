@@ -15,14 +15,14 @@ contract Params {
     // System params
     uint16 public constant MaxValidators = 21;
     // Validator have to wait StakingLockPeriod blocks to withdraw staking
-    uint64 public constant StakingLockPeriod = 86400;
     // Validator have to wait WithdrawProfitPeriod blocks to withdraw his profits
     uint64 public constant WithdrawProfitPeriod = 28800;
     uint256 public constant MinimalStakingCoin = 32 ether;
 
-    uint public constant PosMinMargin = 5 ether;
-    uint public constant PoaMinMargin = 32 ether;
-    uint public constant JailPeriod = 86400;
+    uint public constant PosMinMargin = $(PosMinMargin) ether;
+    uint public constant PoaMinMargin = $(PoaMinMargin) ether;
+    uint public constant JailPeriod = $(JailPeriod);
+    uint64 public constant LockPeriod = $(LockPeriod);
 
     modifier onlyMiner() {
         require(msg.sender == block.coinbase, "Miner only");
