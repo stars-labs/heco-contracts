@@ -52,11 +52,11 @@ contract Validator is Params {
         _;
     }
 
-    function initialize(address[] memory _candidates, address _admin)
+    function initialize(address[] memory _candidates, address[] memory _manager, address _admin)
     external 
     onlyNotInitialized {
         initialized = true;
-        require(_candidates.length > 0, "Invalid params");
+        require(_candidates.length > 0 && _candidates.length == _manager.length, "Invalid params");
         require(_admin != address(0), "Invalid admin address");
         admin = _admin;
 

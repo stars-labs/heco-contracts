@@ -15,7 +15,7 @@ contract("Validator test", accounts => {
     } )
 
     before('init validator', async() => {
-        await validator.initialize(accounts.slice(10, 15), accounts[1], {gas: 12450000})
+        await validator.initialize(accounts.slice(10, 15), accounts.slice(10, 15), accounts[1], {gas: 12450000})
         assert.equal(await validator.admin(), accounts[1])
 
         let vals = await validator.getTopValidators()
