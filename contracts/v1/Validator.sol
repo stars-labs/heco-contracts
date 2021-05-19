@@ -30,6 +30,8 @@ contract Validator is Params {
 
     mapping(CandidateType => SortedLinkedList.List) public topCandidates;
 
+    mapping(uint256 => mapping(Operation => bool)) operationsDone;
+
     event ChangeAdmin(address indexed admin);
     event UpdateParams(uint8 posCount, uint8 posBackup, uint8 poaCount, uint8 poaBackup);
     event AddCandidate(address indexed candidate, address contractAddress);
@@ -45,15 +47,36 @@ contract Validator is Params {
         _;
     }
 
-    //TODO add requirement
-    function initialize(address _admin)
-    external {
+    modifier onlyNotOperated(Operation operation) {
+        require(!operationsDone[block.number][operation], "Already operated");
+        _;
+    }
+
+    function initialize(address[] memory _candidates, address _admin)
+    external 
+    onlyNotInitialized {
+        initialized = true;
+        require(_candidates.length > 0, "Invalid params");
+        require(_admin != address(0), "Invalid admin address");
         admin = _admin;
 
-        count[CandidateType.Pos] = 11;
-        count[CandidateType.Poa] = 10;
-        backupCount[CandidateType.Pos] = 11;
-        backupCount[CandidateType.Poa] = 3;
+        count[CandidateType.Pos] = 0;
+        count[CandidateType.Poa] = 21;
+        backupCount[CandidateType.Pos] = 0;
+        backupCount[CandidateType.Poa] = 0;
+
+        for(uint8 i = 0; i < _candidates.length; i++) {
+            address _candidate = _candidates[i];
+            require(candidates[_candidate] == ICandidate(0), "Candidate already exists");
+            Candidate _candidateContract = new Candidate(_candidate, _candidate, 100, CandidateType.Poa, State.Ready);
+            candidates[_candidate] = ICandidate(address(_candidateContract));
+
+            // #if !Mainnet
+            _candidateContract.setAddress(address(this), address(0));
+            // #endif
+
+            _candidateContract.initialize();
+        }
     }
 
     function changeAdmin(address _newAdmin)
@@ -83,7 +106,8 @@ contract Validator is Params {
     returns (address) {
         require(candidates[_candidate] == ICandidate(0), "Candidate already exists");
 
-        Candidate _candidateContract = new Candidate(_candidate, _manager, _percent, _type);
+        Candidate _candidateContract = new Candidate(_candidate, _manager, _percent, _type, State.Idle);
+
         candidates[_candidate] = ICandidate(address(_candidateContract));
 
         emit AddCandidate(_candidate, address(_candidateContract));
@@ -140,9 +164,13 @@ contract Validator is Params {
     mapping(address => uint8) actives;
 
     function updateActiveValidatorSet(address[] memory newSet, uint256 epoch)
-        //TODO modifier
     external
+    onlyMiner
+    onlyNotOperated(Operation.UpdateValidators)
+    onlyInitialized
+    onlyBlockEpoch(epoch)
     {
+        operationsDone[block.number][Operation.UpdateValidators] = true;
         for (uint8 i = 0; i < activeValidators.length; i ++) {
             actives[activeValidators[i]] = 0;
         }
@@ -175,7 +203,11 @@ contract Validator is Params {
     function distributeBlockReward()
     external
     payable
+    onlyMiner
+    onlyNotOperated(Operation.Distribute) 
+    onlyInitialized
     {
+        operationsDone[block.number][Operation.Distribute] = true;
         //TODO
         uint _total = 0;
         for (uint8 i = 0; i < activeValidators.length; i++) {

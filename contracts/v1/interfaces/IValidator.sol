@@ -9,3 +9,5 @@ interface IValidator {
     function withdrawReward() external ;
     function candidates(address candidate) external view returns (ICandidate);
 }
+
+enum Operation {Distribute, UpdateValidators}

@@ -44,7 +44,7 @@ contract MockValidator is Params {
     returns (address) {
         require(candidates[_candidate] == ICandidate(0), "Candidate already exists");
 
-        Candidate _candidateContract = new Candidate(_candidate, _manager, _percent, _type);
+        Candidate _candidateContract = new Candidate(_candidate, _manager, _percent, _type, State.Idle);
         candidates[_candidate] = ICandidate(address(_candidateContract));
 
         return address(_candidateContract);

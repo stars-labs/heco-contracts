@@ -10,7 +10,7 @@ import "../interfaces/IValidator.sol";
 
 contract MockPunish is Params {
     // clean validator's punish record if one restake in
-    function cleanPunishRecord(address val)
+    function cleanPunishRecord(address _val)
         external 
         onlyInitialized
         returns (bool)

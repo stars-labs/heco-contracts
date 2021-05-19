@@ -81,18 +81,25 @@ contract Candidate is Params {
     event Withdraw(address indexed sender, uint amount);
 
 
-    constructor(address _miner, address _manager, uint8 _percent, CandidateType _type)
+    constructor(address _miner, address _manager, uint8 _percent, CandidateType _type, State _state)
     public
     // #if Mainnet
     onlyValidatorsContract
     // #endif
     onlyValidPercent(_percent) {
-
         candidate = _miner;
         manager = _manager;
         percent = _percent;
         cType = _type;
-        state = State.Idle;
+        state = _state;
+    }
+
+    function initialize()
+    external 
+    onlyValidatorsContract
+    onlyNotInitialized {
+        initialized = true;
+        validator.improveRanking();
     }
 
 
