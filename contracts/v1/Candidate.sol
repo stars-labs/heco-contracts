@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.0 <0.8.0;
 
+// #if Mainnet
 import "./Params.sol";
+// #else
+import "./mock/MockParams.sol";
+// #endif
 import "../library/SafeMath.sol";
 import "./interfaces/ICandidate.sol";
 import "./interfaces/IValidator.sol";
@@ -9,9 +13,6 @@ import "./interfaces/IPunish.sol";
 
 contract Candidate is Params {
     using SafeMath for uint;
-
-    IValidator pool;
-    IPunish punishContract;
 
     CandidateType public cType;
 
@@ -61,11 +62,6 @@ contract Candidate is Params {
         _;
     }
 
-    modifier onlyValidatorsContract() {
-        require(msg.sender == address(pool), "Only Validators contract allowed");
-        _;
-    }
-
     modifier onlyValidPercent(uint16 _percent) {
         require(_percent > 0, "Invalid percent");
         require(_percent <= 1000, "Invalid percent");
@@ -87,10 +83,10 @@ contract Candidate is Params {
 
     constructor(address _miner, address _manager, uint8 _percent, CandidateType _type)
     public
-//TODO    onlyValidatorsContract
+    // #if Mainnet
+    onlyValidatorsContract
+    // #endif
     onlyValidPercent(_percent) {
-        pool = IValidator(msg.sender);
-        punishContract = IPunish(PunishContractAddr);
 
         candidate = _miner;
         manager = _manager;
@@ -150,7 +146,7 @@ contract Candidate is Params {
 
         if (margin >= minMargin) {
             state = State.Ready;
-            punishContract.cleanPunishRecord(candidate);
+            punishcontract.cleanPunishRecord(candidate);
             emit ChangeState(state);
         }
     }
@@ -161,7 +157,7 @@ contract Candidate is Params {
         if (pause && (state == State.Idle || state == State.Ready)) {
             state = State.Pause;
             emit ChangeState(state);
-            pool.removeRanking();
+            validator.removeRanking();
             return;
         }
 
@@ -175,10 +171,12 @@ contract Candidate is Params {
     function punish()
     external
     onlyPunishContract {
-        //TODO
+        require(margin >= PunishAmount, "No enough margin left");
         lastPunishedBlk = block.number;
         state = State.Jail;
-        address(0).transfer(margin);
+        validator.removeRanking();
+        margin -= PunishAmount;
+        address(0).transfer(PunishAmount);
 
         return;
     }
@@ -192,7 +190,7 @@ contract Candidate is Params {
         state = State.Idle;
         emit ChangeState(state);
 
-        pool.removeRanking();
+        validator.removeRanking();
         emit ExitVote();
     }
 
@@ -215,7 +213,7 @@ contract Candidate is Params {
     external
     payable
     onlyManager {
-        pool.withdrawReward();
+        validator.withdrawReward();
         require(reward > 0, "No more margin");
 
         uint _amount = reward;
@@ -239,7 +237,7 @@ contract Candidate is Params {
     function deposit()
     external
     payable {
-        pool.withdrawReward();
+        validator.withdrawReward();
 
         uint _pendingReward = accRewardPerShare.mul(voters[msg.sender].amount).div(1e18).sub(voters[msg.sender].rewardDebt);
 
@@ -250,7 +248,7 @@ contract Candidate is Params {
             totalVote = totalVote.add(msg.value);
 
             if (state == State.Ready) {
-                pool.improveRanking();
+                validator.improveRanking();
             }
             emit Deposit(msg.sender, msg.value);
         } else {
@@ -266,7 +264,7 @@ contract Candidate is Params {
     function withdraw()
     external {
         require(block.number - voters[msg.sender].lastVoteBlk >= LockPeriod, "Interval too small");
-        pool.withdrawReward();
+        validator.withdrawReward();
 
         uint _pendingReward = accRewardPerShare.mul(voters[msg.sender].amount).div(1e18).sub(voters[msg.sender].rewardDebt);
 
@@ -277,7 +275,7 @@ contract Candidate is Params {
         voters[msg.sender].rewardDebt = 0;
 
         if (state == State.Ready) {
-            pool.lowerRanking();
+            validator.lowerRanking();
         }
 
         if (_amount > 0) {

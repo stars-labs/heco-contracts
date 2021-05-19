@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.0 <0.8.0;
 
-import "../../library/SafeMath.sol";
+// #if Mainnet
 import "../Params.sol";
+// #else
+import "./MockParams.sol";
+// #endif
+import "../../library/SafeMath.sol";
 import "../library/SortedList.sol";
 import "../interfaces/ICandidate.sol";
 import "../Candidate.sol";

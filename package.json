@@ -21,7 +21,7 @@
     "web3": "^1.3.6"
   },
   "scripts": {
-    "test": "yarn run hardhat test test/v1/*",
+    "test": "NET=devnet yarn run hardhat test test/v1/*",
     "clean": "yarn run hardhat clean",
     "compile": "yarn run hardhat compile"
   },

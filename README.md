@@ -5,25 +5,19 @@
 Install dependency:
 
 ```bash
-npm install
+yarn
 ```
 
 ## unit test
 
-Generate test contract files:
+Compile files:
 
 ```bash
-node generate-mock-contracts.js
-```
-
-Start ganache:
-
-```bash
-ganache-cli -e 20000000000 -a 100 -l 8000000 -g 0
+NET=mainnet yarn compile
 ```
 
 Test:
 
 ```bash
-truffle test
+yarn test
 ```

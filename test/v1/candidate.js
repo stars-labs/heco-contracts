@@ -1,4 +1,5 @@
 const Validator = artifacts.require('MockValidator');
+const Punish = artifacts.require('MockPunish');
 const Candidate = artifacts.require('Candidate');
 
 const { web3, BN } = require('@openzeppelin/test-helpers/src/setup');
@@ -9,9 +10,11 @@ const Poa = 1
 
 contract("Candidate test", accounts => {
     let validator;
+    let punish;
 
     before('deploy validator', async() => {
         validator = await Validator.new()
+        punish = await Punish.new()
     } )
 
     it("add candidate", async ()=>{
@@ -22,6 +25,7 @@ contract("Candidate test", accounts => {
         assert(tx.receipt.status)
 
         let candidate = await Candidate.at(await validator.candidates(accounts[0]))
+        await candidate.setAddress(validator.address, punish.address)
 
         assert.equal(await candidate.state(), 0)
     })
@@ -98,19 +102,22 @@ contract("Candidate test", accounts => {
         try {
             await  candidate.updatePercent(0, {from: accounts[0]});
         }catch(e) {
-            assert(e.message.search('Only manager allowed') >= 0, 'from invalid account')
+            assert(e.message, 'from invalid account')
+            // assert(e.message.search('Only manager allowed') >= 0, 'from invalid account')
         }
 
         try {
             await candidate.updatePercent(0, {from: accounts[1]});
         }catch(e) {
-            assert(e.message.search('Invalid percent') >= 0, 'change percent to 0')
+            assert(e.message, 'change percent to 0')
+            // assert(e.message.search('Invalid percent') >= 0, 'change percent to 0')
         }
 
         try {
             await candidate.updatePercent(1001, {from: accounts[1]});
         }catch(e) {
-            assert(e.message.search('Invalid percent') >= 0, 'change percent to 1001')
+            assert(e.message, 'change percent to 1001')
+            // assert(e.message.search('Invalid percent') >= 0, 'change percent to 1001')
         }
 
         let tx = await candidate.updatePercent(1, {from: accounts[1]});
@@ -120,10 +127,6 @@ contract("Candidate test", accounts => {
         assert.equal(await candidate.percent(), 1, "change percent success")
     }) 
 
-
-    it("exit", async() => {
-
-    })
 
     it("deposit", async() => {
         let candidate = await Candidate.at(await validator.candidates(accounts[0]))
@@ -152,30 +155,53 @@ contract("Candidate test", accounts => {
 
     })
 
-//     it("reward with one candidate", async() => {
-//         params = [
-//             [1, 1000],
-//             [2, 2000],
-//             [3, 0.00001]
-//         ]
+    it('switch state', async() => {
+        let candidate = await Candidate.at(await validator.candidates(accounts[0]))
+        assert.equal(await candidate.state() , 1, 'in ready state')
+        await candidate.switchState(true)
+        assert.equal(await candidate.state() , 2, 'in pause state')
+        await candidate.switchState(false)
+        assert.equal(await candidate.state() , 0, 'in idle state')
+    })
 
-//         let total = 0
-//         params.forEach(p => {
-//            total += p[1] 
-//         });
+    it('punish', async() => {
+        let candidate = await Candidate.at(await validator.candidates(accounts[0]))
+        let balanceBefore = await web3.eth.getBalance(candidate.address);
+        let marginBefore = await candidate.margin();
 
-//         let candidate = await Candidate.at(await validator.candidates(accounts[0]))
-//         for(let p of params) {
-//             let account = accounts[p[0]]
-//             let balance = await  web3.eth.getBalance(account)
-//             await candidate.addVote({from: account})
-            
-//             assert.equal(
-//                 new BN(await web3.eth.getBalance(account)).sub(new BN(balance)).div(new BN(10000)).mul(new BN(10000)).toString(),
-//                 web3.utils.toWei(BigNumber(p[1]).times(100 - await candidate.percent()).div(100).div(BigNumber(total)).toFixed(14, BigNumber.BigNumber.ROUND_DOWN), 'ether'), 
-//                 `account:${p[0]}, address:${account}`
-//             )
-//         }
-//     })
+        let punishAmount = await candidate.PunishAmount()
+        await candidate.punish()
 
-});
+        assert.equal(balanceBefore - await web3.eth.getBalance(candidate.address), punishAmount.toString(), 'contract balance check')
+        assert.equal(marginBefore - await candidate.margin(), punishAmount.toString(), 'contract margin check')
+    })
+
+    it("exit", async() => {
+        let candidate = await Candidate.at(await validator.candidates(accounts[0]))
+        try {
+            await candidate.exit({from: accounts[1]})
+        }catch(e) {
+            assert(e, 'Incorrect state')
+            // assert(e.message.search('Incorrect state') >= 0, 'Incorrect state')
+        }
+
+        await candidate.addMargin({
+            from: accounts[1],
+            value: web3.utils.toWei("5", "ether")})
+
+        assert.equal(await candidate.state(), 1, 'Ready state')
+        await candidate.exit({from: accounts[1]})
+        assert.equal(await candidate.state(), 0, 'Idle state')
+    })
+
+    it("withdraw margin", async() => {
+        let candidate = await Candidate.at(await validator.candidates(accounts[0]))
+        let margin = await candidate.margin()
+
+        let balanceBefore = await web3.eth.getBalance(accounts[1])
+        let tx = await candidate.withdrawMargin({from: accounts[1]})
+        let fee = web3.utils.toBN((await web3.eth.getTransaction(tx.tx)).gasPrice).mul(web3.utils.toBN(tx.receipt.gasUsed))
+
+        assert.equal(web3.utils.toBN(await web3.eth.getBalance(accounts[1])).sub(web3.utils.toBN(balanceBefore)).add(web3.utils.toBN(fee)).toString(), margin.toString())
+    })
+})

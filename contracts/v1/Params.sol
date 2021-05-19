@@ -1,22 +1,27 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.0 <0.8.0;
+import "./interfaces/IValidator.sol";
+import "./interfaces/IPunish.sol";
 
 contract Params {
     bool public initialized;
 
     // System contracts
-    address
-        public constant ValidatorContractAddr = $(ValidatorContractAddr);
-    address
-        public constant PunishContractAddr = $(PunishContractAddr);
+    IValidator 
+        public constant validator = IValidator(0x000000000000000000000000000000000000f000);
+    IPunish 
+        public constant punishcontract = IPunish(0x000000000000000000000000000000000000F001);
 
     // System params
     uint16 public constant MaxValidators = 21;
 
-    uint public constant PosMinMargin = $(PosMinMargin) ether;
-    uint public constant PoaMinMargin = $(PoaMinMargin) ether;
-    uint public constant JailPeriod = $(JailPeriod);
-    uint64 public constant LockPeriod = $(LockPeriod);
+    uint public constant PosMinMargin = 5000 ether;
+    uint public constant PoaMinMargin = 1 ether;
+
+    uint public constant PunishAmount = 100 ether;
+
+    uint public constant JailPeriod = 86400;
+    uint64 public constant LockPeriod = 86400;
 
     modifier onlyMiner() {
         require(msg.sender == block.coinbase, "Miner only");
@@ -34,7 +39,7 @@ contract Params {
     }
 
     modifier onlyPunishContract() {
-        require(msg.sender == PunishContractAddr, "Punish contract only");
+        require(msg.sender == address(punishcontract), "Punish contract only");
         _;
     }
 
@@ -43,11 +48,11 @@ contract Params {
         _;
     }
 
-    // modifier onlyValidatorsContract() {
-    //     require(
-    //         msg.sender == ValidatorContractAddr,
-    //         "Validators contract only"
-    //     );
-    //     _;
-    // }
+    modifier onlyValidatorsContract() {
+        require(
+            msg.sender == address(validator),
+            "Validators contract only"
+        );
+        _;
+    }
 }

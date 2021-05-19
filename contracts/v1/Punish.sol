@@ -1,6 +1,10 @@
 pragma solidity >=0.6.0 <0.8.0;
 
+// #if Mainnet
 import "./Params.sol";
+// #else
+import "./mock/MockParams.sol";
+// #endif
 import "./interfaces/ICandidate.sol";
 import "./interfaces/IValidator.sol";
 
@@ -14,8 +18,6 @@ contract Punish is Params {
         uint256 index;
         bool exist;
     }
-
-    IValidator validator;
 
     mapping(address => PunishRecord) punishRecords;
     address[] public punishValidators;
@@ -37,7 +39,6 @@ contract Punish is Params {
     }
 
     function initialize() external onlyNotInitialized {
-        validator = IValidator(ValidatorContractAddr);
         punishThreshold = 24;
         removeThreshold = 48;
         decreaseRate = 24;
