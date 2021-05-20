@@ -83,9 +83,9 @@ contract Candidate is Params {
 
     constructor(address _miner, address _manager, uint8 _percent, CandidateType _type, State _state)
     public
-    // #if Mainnet
+        // #if Mainnet
     onlyValidatorsContract
-    // #endif
+        // #endif
     onlyValidPercent(_percent) {
         candidate = _miner;
         manager = _manager;
@@ -95,7 +95,7 @@ contract Candidate is Params {
     }
 
     function initialize()
-    external 
+    external
     onlyValidatorsContract
     onlyNotInitialized {
         initialized = true;
@@ -201,7 +201,6 @@ contract Candidate is Params {
         emit ExitVote();
     }
 
-    
     function withdrawMargin()
     external
     onlyManager {

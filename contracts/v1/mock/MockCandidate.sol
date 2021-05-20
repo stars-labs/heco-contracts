@@ -41,6 +41,17 @@ contract MockCandidate is Params {
     external {
     }
 
+    function addMargin()
+    external
+    payable
+    {
+    }
+
+    function deposit()
+    external
+    payable {
+    }
+
     function changeVote(uint _vote) external {
         totalVote = _vote;
     }
@@ -48,7 +59,7 @@ contract MockCandidate is Params {
     function changeVoteAndRanking(IValidator _pool, uint _vote) external {
         totalVote = _vote;
 
-        if(_vote > totalVote) {
+        if (_vote > totalVote) {
             _pool.improveRanking();
         } else {
             _pool.lowerRanking();

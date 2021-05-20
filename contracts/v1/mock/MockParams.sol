@@ -45,7 +45,7 @@ contract Params {
     }
 
     modifier onlyBlockEpoch(uint256 epoch) {
-        require(block.number % epoch == 0, "Block epoch only");
+        // require(block.number % epoch == 0, "Block epoch only");
         _;
     }
 
@@ -55,7 +55,6 @@ contract Params {
     }
 
     function setAddress(address _val, address _punish) 
-    onlyNotInitialized
     external {
         validator = IValidator(_val);
         punishcontract = IPunish(_punish);

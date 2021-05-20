@@ -28,7 +28,6 @@ contract MockValidator is Params {
 
     mapping(address => uint) public pendingReward;
 
-    //TODO add requirement
     function initialize(address _admin)
     external {
         admin = _admin;
@@ -92,6 +91,6 @@ contract MockValidator is Params {
 
     function removeRanking()
     external {
-    
+
     }
 }

@@ -46,39 +46,39 @@ contract Punish is Params {
         initialized = true;
     }
 
-    function punish(address val)
-        external
-        onlyMiner
-        onlyInitialized
-        onlyNotPunished
+    function punish(address _val)
+    external
+    onlyMiner
+    onlyInitialized
+    onlyNotPunished
     {
         punished[block.number] = true;
-        if (!punishRecords[val].exist) {
-            punishRecords[val].index = punishValidators.length;
-            punishValidators.push(val);
-            punishRecords[val].exist = true;
+        if (!punishRecords[_val].exist) {
+            punishRecords[_val].index = punishValidators.length;
+            punishValidators.push(_val);
+            punishRecords[_val].exist = true;
         }
-        punishRecords[val].missedBlocksCounter++;
+        punishRecords[_val].missedBlocksCounter++;
 
-        if (punishRecords[val].missedBlocksCounter % removeThreshold == 0) {
-            ICandidate candidate = validator.candidates(val);
+        if (punishRecords[_val].missedBlocksCounter % removeThreshold == 0) {
+            ICandidate candidate = validator.candidates(_val);
             candidate.punish();
             // reset validator's missed blocks counter
-            punishRecords[val].missedBlocksCounter = 0;
-        } else if (punishRecords[val].missedBlocksCounter % punishThreshold == 0) {
-            //TODO 
+            punishRecords[_val].missedBlocksCounter = 0;
+        } else if (punishRecords[_val].missedBlocksCounter % punishThreshold == 0) {
+            //TODO
             // validator.removeValidatorIncoming(val);
         }
 
-        emit LogPunishValidator(val, block.timestamp);
+        emit LogPunishValidator(_val, block.timestamp);
     }
 
-    function decreaseMissedBlocksCounter(uint256 epoch)
-        external
-        onlyMiner
-        onlyNotDecreased
-        onlyInitialized
-        onlyBlockEpoch(epoch)
+    function decreaseMissedBlocksCounter(uint256 _epoch)
+    external
+    onlyMiner
+    onlyNotDecreased
+    onlyInitialized
+    onlyBlockEpoch(_epoch)
     {
         decreased[block.number] = true;
         if (punishValidators.length == 0) {
@@ -89,9 +89,9 @@ contract Punish is Params {
             if (
                 punishRecords[punishValidators[i]].missedBlocksCounter > removeThreshold / decreaseRate) {
                 punishRecords[punishValidators[i]].missedBlocksCounter =
-                    punishRecords[punishValidators[i]].missedBlocksCounter -
-                    removeThreshold /
-                    decreaseRate;
+                punishRecords[punishValidators[i]].missedBlocksCounter -
+                removeThreshold /
+                decreaseRate;
             } else {
                 punishRecords[punishValidators[i]].missedBlocksCounter = 0;
             }
@@ -101,27 +101,27 @@ contract Punish is Params {
     }
 
     // clean validator's punish record if one restake in
-    function cleanPunishRecord(address val)
-        external 
-        onlyInitialized
-        returns (bool)
+    function cleanPunishRecord(address _val)
+    external
+    onlyInitialized
+    returns (bool)
     {
-        require(address(validator.candidates(val)) == msg.sender, "Candidate not registered");
-        if (punishRecords[val].missedBlocksCounter != 0) {
-            punishRecords[val].missedBlocksCounter = 0;
+        require(address(validator.candidates(_val)) == msg.sender, "Candidate not registered");
+        if (punishRecords[_val].missedBlocksCounter != 0) {
+            punishRecords[_val].missedBlocksCounter = 0;
         }
 
         // remove it out of array if exist
-        if (punishRecords[val].exist && punishValidators.length > 0) {
-            if (punishRecords[val].index != punishValidators.length - 1) {
+        if (punishRecords[_val].exist && punishValidators.length > 0) {
+            if (punishRecords[_val].index != punishValidators.length - 1) {
                 address uval = punishValidators[punishValidators.length - 1];
-                punishValidators[punishRecords[val].index] = uval;
+                punishValidators[punishRecords[_val].index] = uval;
 
-                punishRecords[uval].index = punishRecords[val].index;
+                punishRecords[uval].index = punishRecords[_val].index;
             }
             punishValidators.pop();
-            punishRecords[val].index = 0;
-            punishRecords[val].exist = false;
+            punishRecords[_val].index = 0;
+            punishRecords[_val].exist = false;
         }
 
         return true;

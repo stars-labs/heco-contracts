@@ -23,6 +23,8 @@ contract Validator is Params {
     address[] public activeValidators;
     address[] public backupValidators;
 
+    mapping(address => uint8) actives;
+
     // candidate address => contract address
     mapping(address => ICandidate) public candidates;
 
@@ -53,7 +55,7 @@ contract Validator is Params {
     }
 
     function initialize(address[] memory _candidates, address[] memory _manager, address _admin)
-    external 
+    external
     onlyNotInitialized {
         initialized = true;
         require(_candidates.length > 0 && _candidates.length == _manager.length, "Invalid params");
@@ -65,7 +67,7 @@ contract Validator is Params {
         backupCount[CandidateType.Pos] = 0;
         backupCount[CandidateType.Poa] = 0;
 
-        for(uint8 i = 0; i < _candidates.length; i++) {
+        for (uint8 i = 0; i < _candidates.length; i++) {
             address _candidate = _candidates[i];
             require(candidates[_candidate] == ICandidate(0), "Candidate already exists");
             Candidate _candidateContract = new Candidate(_candidate, _candidate, 100, CandidateType.Poa, State.Ready);
@@ -142,6 +144,7 @@ contract Validator is Params {
 
         address[] memory _topValidators = new address[](_count);
 
+        uint8 _index = 0;
         for (uint8 i = 0; i < _types.length; i++) {
             CandidateType _type = _types[i];
             SortedLinkedList.List storage _list = topCandidates[_type];
@@ -149,7 +152,6 @@ contract Validator is Params {
 
             uint8 _size = count[_type];
             ICandidate cur = _list.head;
-            uint8 _index = 0;
             while (_size > 0 && cur != ICandidate(0)) {
                 _topValidators[_index] = cur.candidate();
                 _index++;
@@ -161,16 +163,18 @@ contract Validator is Params {
         return _topValidators;
     }
 
-    mapping(address => uint8) actives;
 
     function updateActiveValidatorSet(address[] memory newSet, uint256 epoch)
     external
+        // #if Mainnet
     onlyMiner
+        // #endif
     onlyNotOperated(Operation.UpdateValidators)
-    onlyInitialized
     onlyBlockEpoch(epoch)
+    onlyInitialized
     {
         operationsDone[block.number][Operation.UpdateValidators] = true;
+
         for (uint8 i = 0; i < activeValidators.length; i ++) {
             actives[activeValidators[i]] = 0;
         }
@@ -181,9 +185,7 @@ contract Validator is Params {
         }
 
 
-        for(uint8 i = 0; i < backupValidators.length; i ++) {
-            delete backupValidators[backupValidators.length - 1];
-        }
+        delete backupValidators;
 
         CandidateType[2] memory types = [CandidateType.Pos, CandidateType.Poa];
         for (uint8 i = 0; i < types.length; i++) {
@@ -191,7 +193,7 @@ contract Validator is Params {
             SortedLinkedList.List storage topList = topCandidates[types[i]];
             ICandidate cur = topList.head;
             while (size >= 0 && cur != ICandidate(0)) {
-                if(actives[cur.candidate()] == 0) {
+                if (actives[cur.candidate()] == 0) {
                     backupValidators.push(cur.candidate());
                     size--;
                 }
@@ -200,24 +202,59 @@ contract Validator is Params {
         }
     }
 
+    function getActiveValidatorsCount()
+    external
+    view
+    returns (uint){
+        return activeValidators.length;
+    }
+
+    function getBackupValidatorsCount()
+    external
+    view
+    returns (uint){
+        return backupValidators.length;
+    }
+
     function distributeBlockReward()
     external
     payable
+        // #if Mainnet
     onlyMiner
-    onlyNotOperated(Operation.Distribute) 
+        // #endif
+    onlyNotOperated(Operation.Distribute)
     onlyInitialized
     {
         operationsDone[block.number][Operation.Distribute] = true;
-        //TODO
-        uint _total = 0;
-        for (uint8 i = 0; i < activeValidators.length; i++) {
-            _total += candidates[activeValidators[i]].totalVote();
+
+        uint _left = msg.value;
+        // 20% to backups 40% validators share by vote 40% validators share
+        if (backupValidators.length > 0) {
+            uint _firstPart = msg.value.mul(20).div(100).div(backupValidators.length);
+            for (uint8 i = 0; i < backupValidators.length; i++) {
+                ICandidate _c = candidates[backupValidators[i]];
+                pendingReward[address(_c)] = pendingReward[address(_c)].add(_firstPart);
+            }
+            _left = _left.sub(_firstPart.mul(backupValidators.length));
         }
 
-        if (_total > 0) {
+        if (activeValidators.length > 0) {
+            uint _totalVote = 0;
             for (uint8 i = 0; i < activeValidators.length; i++) {
-                ICandidate c = candidates[activeValidators[i]];
-                pendingReward[address(c)] += c.totalVote().mul(msg.value).div(_total);
+                _totalVote = _totalVote.add(candidates[activeValidators[i]].totalVote());
+            }
+
+            uint _secondPartTotal = _totalVote > 0 ? msg.value.mul(40).div(100) : 0;
+
+            uint _thirdPart = _left.sub(_secondPartTotal).div(activeValidators.length);
+            for (uint8 i = 0; i < activeValidators.length; i++) {
+                ICandidate _c = candidates[activeValidators[i]];
+                if (_totalVote > 0) {
+                    uint _secondPart = _c.totalVote().mul(_secondPartTotal).div(_totalVote);
+                    pendingReward[address(_c)] = pendingReward[address(_c)].add(_secondPart).add(_thirdPart);
+                } else {
+                    pendingReward[address(_c)] = pendingReward[address(_c)].add(_thirdPart);
+                }
             }
         }
     }
