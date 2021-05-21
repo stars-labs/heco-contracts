@@ -8,6 +8,7 @@ interface IValidator {
     function removeRanking() external;
     function withdrawReward() external ;
     function candidates(address candidate) external view returns (ICandidate);
+    function removeValidatorIncoming(address candidate) external;
 }
 
 enum Operation {Distribute, UpdateValidators}

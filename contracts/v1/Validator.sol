@@ -298,4 +298,11 @@ contract Validator is Params {
         SortedLinkedList.List storage _list = topCandidates[_candidate.cType()];
         _list.removeRanking(_candidate);
     }
+
+    function removeValidatorIncoming(address _candidate)
+    external
+    onlyPunishContract {
+        ICandidate _canContract = candidates[_candidate];
+        pendingReward[address(_canContract)] = 0;
+    }
 }
