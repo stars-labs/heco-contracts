@@ -152,8 +152,6 @@ contract("Candidate test", accounts => {
         await validator.distributeBlockReward({from: accounts[0], gas: 400000, value: web3.utils.toWei("1", "ether")})
         assert.equal(web3.utils.toWei("1", "ether"), await web3.eth.getBalance(validator.address))
         assert.equal(web3.utils.toWei("1", "ether"), await validator.pendingReward(await validator.candidates(accounts[0])))
-
-
     })
 
     it('switch state', async() => {
