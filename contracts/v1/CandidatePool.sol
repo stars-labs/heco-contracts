@@ -11,7 +11,7 @@ import "./interfaces/ICandidate.sol";
 import "./interfaces/IValidator.sol";
 import "./interfaces/IPunish.sol";
 
-contract Candidate is Params {
+contract CandidatePool is Params {
     using SafeMath for uint;
 
     CandidateType public cType;

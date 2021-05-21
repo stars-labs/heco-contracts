@@ -1,6 +1,6 @@
 const Validator = artifacts.require('MockValidator');
 const Punish = artifacts.require('MockPunish');
-const Candidate = artifacts.require('Candidate');
+const Candidate = artifacts.require('CandidatePool');
 
 const { web3, BN } = require('@openzeppelin/test-helpers/src/setup');
 const truffleAssert = require('truffle-assertions')
@@ -64,7 +64,7 @@ contract("Candidate test", accounts => {
 
         truffleAssert.eventEmitted(tx, 'AddMargin',  ev => ev.sender === accounts[1]
             && ev.amount == web3.utils.toWei("1", "ether").toString())
-        
+
         assert.equal(await candidate.state(), 0)
 
         tx = await candidate.addMargin({
@@ -75,7 +75,7 @@ contract("Candidate test", accounts => {
             && ev.amount == web3.utils.toWei("4", "ether").toString())
 
         truffleAssert.eventEmitted(tx, 'ChangeState',  ev => ev.state == 1)
-        
+
         assert.equal(await candidate.state(), 1)
     })
 
@@ -125,7 +125,7 @@ contract("Candidate test", accounts => {
 
         await candidate.confirmPercentChange({from: accounts[1]});
         assert.equal(await candidate.percent(), 1, "change percent success")
-    }) 
+    })
 
 
     it("deposit", async() => {

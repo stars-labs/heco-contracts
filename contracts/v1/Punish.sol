@@ -61,7 +61,7 @@ contract Punish is Params {
         punishRecords[_val].missedBlocksCounter++;
 
         if (punishRecords[_val].missedBlocksCounter % removeThreshold == 0) {
-            ICandidate candidate = validator.candidates(_val);
+            ICandidatePool candidate = validator.candidates(_val);
             candidate.punish();
             // reset validator's missed blocks counter
             punishRecords[_val].missedBlocksCounter = 0;

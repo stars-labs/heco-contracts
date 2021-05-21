@@ -9,7 +9,7 @@ import "./MockParams.sol";
 import "../../library/SafeMath.sol";
 import "../library/SortedList.sol";
 import "../interfaces/ICandidate.sol";
-import "../Candidate.sol";
+import "../CandidatePool.sol";
 
 contract MockValidator is Params {
     using SafeMath for uint;
@@ -24,7 +24,7 @@ contract MockValidator is Params {
     address[] public backupValidators;
 
     // candidate address => contract address
-    mapping(address => ICandidate) public candidates;
+    mapping(address => ICandidatePool) public candidates;
 
     mapping(address => uint) public pendingReward;
 
@@ -41,10 +41,10 @@ contract MockValidator is Params {
     function addCandidate(address _candidate, address _manager, uint8 _percent, CandidateType _type)
     external
     returns (address) {
-        require(candidates[_candidate] == ICandidate(0), "Candidate already exists");
+        require(candidates[_candidate] == ICandidatePool(0), "Candidate already exists");
 
-        Candidate _candidateContract = new Candidate(_candidate, _manager, _percent, _type, State.Idle);
-        candidates[_candidate] = ICandidate(address(_candidateContract));
+        CandidatePool _candidateContract = new CandidatePool(_candidate, _manager, _percent, _type, State.Idle);
+        candidates[_candidate] = ICandidatePool(address(_candidateContract));
 
         return address(_candidateContract);
     }
@@ -60,7 +60,7 @@ contract MockValidator is Params {
 
         if (_total > 0) {
             for (uint8 i = 0; i < activeValidators.length; i++) {
-                ICandidate c = candidates[activeValidators[i]];
+                ICandidatePool c = candidates[activeValidators[i]];
                 pendingReward[address(c)] += c.totalVote().mul(msg.value).div(_total);
             }
         }
@@ -74,7 +74,7 @@ contract MockValidator is Params {
         }
 
         pendingReward[msg.sender] = 0;
-        Candidate(msg.sender).updateReward{value : _amount}();
+        CandidatePool(msg.sender).updateReward{value : _amount}();
     }
 
     function updateActiveValidatorSet(address[] memory newSet) external {

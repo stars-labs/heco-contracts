@@ -1,5 +1,5 @@
 const Validator = artifacts.require('Validator');
-const Candidate = artifacts.require('MockCandidate');
+const Candidate = artifacts.require('MockCandidatePool');
 const Punish = artifacts.require('MockPunish');
 
 const { assert } = require('hardhat');
@@ -58,8 +58,8 @@ contract("Validator test", accounts => {
         }
 
         let tx = await validator.updateParams(20,10, 1, 11, {from: accounts[0]})
-      
-        truffleAssert.eventEmitted(tx, 'UpdateParams', ev => ev.posCount.toNumber() === 20 
+
+        truffleAssert.eventEmitted(tx, 'UpdateParams', ev => ev.posCount.toNumber() === 20
         && ev.posBackup.toNumber() === 10
         && ev.poaCount.toNumber() === 1
         && ev.poaBackup.toNumber() === 11)
@@ -87,7 +87,7 @@ contract("Validator test", accounts => {
     })
 
     it('only registered', async () => {
-        let c = await Candidate.new(accounts[0], accounts[0], 0, 1)        
+        let c = await Candidate.new(accounts[0], accounts[0], 0, 1)
         await c.changeVote(50)
         try {
             await c.changeVoteAndRanking(await validator.address, 100)
@@ -109,23 +109,23 @@ contract("Validator test", accounts => {
         assert.equal(await validator.getBackupValidatorsCount(), 4, 'backup validators length')
     })
 
-    it('distributeBlockReward', async() => {        
+    it('distributeBlockReward', async() => {
         await validator.addCandidate(accounts[1], accounts[1], 10, Pos, {
             from: accounts[0],
             gas: 2000000
         })
-       
+
         let candidate0 = await Candidate.at(await validator.candidates(accounts[0]))
         let candidate1 = await Candidate.at(await validator.candidates(accounts[1]))
-            
+
         for(let can of [candidate0, candidate1]) {
             await can.setAddress(validator.address, punish.address)
-            
+
             let from = await can.candidate()
             await can.addMargin({from, value: web3.utils.toWei("10", 'ether')})
             await can.deposit({from, value: web3.utils.toWei("10", 'ether')})
         }
-        
+
         let vals = await validator.getTopValidators()
         await validator.updateActiveValidatorSet(vals, 200)
         assert.equal(await validator.getActiveValidatorsCount(), 3, 'active validators length')
@@ -144,7 +144,7 @@ contract("Validator test", accounts => {
         assert.equal((await validator.pendingReward(await validator.candidates(accounts[10]))).toString(), web3.utils.toWei(new BN(100), "ether").mul(new BN(4)).div(new BN(30)).toString())
 
         //staking  100 * 0.4 / 3 + 100 * 0.4 / 2
-        assert.equal((await validator.pendingReward(await validator.candidates(accounts[0]))).toString(), 
+        assert.equal((await validator.pendingReward(await validator.candidates(accounts[0]))).toString(),
         web3.utils.toWei(new BN(100), "ether").mul(new BN(4)).div(new BN(30)).add(
             web3.utils.toWei(new BN(100), "ether").mul(new BN(4)).div(new BN(20))
         ).toString())

@@ -7,7 +7,7 @@ interface IValidator {
     function lowerRanking() external ;
     function removeRanking() external;
     function withdrawReward() external ;
-    function candidates(address candidate) external view returns (ICandidate);
+    function candidates(address candidate) external view returns (ICandidatePool);
     function removeValidatorIncoming(address candidate) external;
 }
 

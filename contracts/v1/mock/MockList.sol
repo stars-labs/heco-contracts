@@ -9,31 +9,31 @@ contract MockList {
 
     SortedLinkedList.List public list;
 
-    function improveRanking(ICandidate _value) external {
+    function improveRanking(ICandidatePool _value) external {
         list.improveRanking(_value);
     }
 
-    function lowerRanking(ICandidate _value) external {
+    function lowerRanking(ICandidatePool _value) external {
         list.lowerRanking(_value);
     }
 
-    function removeRanking(ICandidate _value) external {
+    function removeRanking(ICandidatePool _value) external {
         list.removeRanking(_value);
     }
 
-    function prev(ICandidate _value) view external returns(ICandidate){
+    function prev(ICandidatePool _value) view external returns(ICandidatePool){
         return list.prev[_value];
     }
 
-    function next(ICandidate _value) view external returns(ICandidate){
+    function next(ICandidatePool _value) view external returns(ICandidatePool){
         return list.next[_value];
     }
 
     function clear() external {
-        ICandidate _tail = list.tail;
+        ICandidatePool _tail = list.tail;
 
-        while(_tail != ICandidate(0)) {
-            ICandidate _prev = list.prev[_tail];
+        while(_tail != ICandidatePool(0)) {
+            ICandidatePool _prev = list.prev[_tail];
             list.removeRanking(_tail);
             _tail = _prev;
         }

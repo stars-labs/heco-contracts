@@ -7,7 +7,7 @@ import "./Params.sol";
 import "./mock/MockParams.sol";
 // #endif
 import "../library/SafeMath.sol";
-import "./Candidate.sol";
+import "./CandidatePool.sol";
 import "./library/SortedList.sol";
 import "./interfaces/ICandidate.sol";
 
@@ -26,7 +26,7 @@ contract Validator is Params {
     mapping(address => uint8) actives;
 
     // candidate address => contract address
-    mapping(address => ICandidate) public candidates;
+    mapping(address => ICandidatePool) public candidates;
 
     mapping(address => uint) public pendingReward;
 
@@ -44,7 +44,7 @@ contract Validator is Params {
     }
 
     modifier onlyRegistered() {
-        ICandidate _candidate = ICandidate(msg.sender);
+        ICandidatePool _candidate = ICandidatePool(msg.sender);
         require(candidates[_candidate.candidate()] == _candidate, "Candidate not registered");
         _;
     }
@@ -69,9 +69,9 @@ contract Validator is Params {
 
         for (uint8 i = 0; i < _candidates.length; i++) {
             address _candidate = _candidates[i];
-            require(candidates[_candidate] == ICandidate(0), "Candidate already exists");
-            Candidate _candidateContract = new Candidate(_candidate, _candidate, 100, CandidateType.Poa, State.Ready);
-            candidates[_candidate] = ICandidate(address(_candidateContract));
+            require(candidates[_candidate] == ICandidatePool(0), "Candidate already exists");
+            CandidatePool _candidateContract = new CandidatePool(_candidate, _candidate, 100, CandidateType.Poa, State.Ready);
+            candidates[_candidate] = ICandidatePool(address(_candidateContract));
 
             // #if !Mainnet
             _candidateContract.setAddress(address(this), address(0));
@@ -106,11 +106,11 @@ contract Validator is Params {
     external
     onlyAdmin
     returns (address) {
-        require(candidates[_candidate] == ICandidate(0), "Candidate already exists");
+        require(candidates[_candidate] == ICandidatePool(0), "Candidate already exists");
 
-        Candidate _candidateContract = new Candidate(_candidate, _manager, _percent, _type, State.Idle);
+        CandidatePool _candidateContract = new CandidatePool(_candidate, _manager, _percent, _type, State.Idle);
 
-        candidates[_candidate] = ICandidate(address(_candidateContract));
+        candidates[_candidate] = ICandidatePool(address(_candidateContract));
 
         emit AddCandidate(_candidate, address(_candidateContract));
 
@@ -151,8 +151,8 @@ contract Validator is Params {
 
 
             uint8 _size = count[_type];
-            ICandidate cur = _list.head;
-            while (_size > 0 && cur != ICandidate(0)) {
+            ICandidatePool cur = _list.head;
+            while (_size > 0 && cur != ICandidatePool(0)) {
                 _topValidators[_index] = cur.candidate();
                 _index++;
                 _size--;
@@ -191,8 +191,8 @@ contract Validator is Params {
         for (uint8 i = 0; i < types.length; i++) {
             uint8 size = backupCount[types[i]];
             SortedLinkedList.List storage topList = topCandidates[types[i]];
-            ICandidate cur = topList.head;
-            while (size >= 0 && cur != ICandidate(0)) {
+            ICandidatePool cur = topList.head;
+            while (size >= 0 && cur != ICandidatePool(0)) {
                 if (actives[cur.candidate()] == 0) {
                     backupValidators.push(cur.candidate());
                     size--;
@@ -232,7 +232,7 @@ contract Validator is Params {
         if (backupValidators.length > 0) {
             uint _firstPart = msg.value.mul(20).div(100).div(backupValidators.length);
             for (uint8 i = 0; i < backupValidators.length; i++) {
-                ICandidate _c = candidates[backupValidators[i]];
+                ICandidatePool _c = candidates[backupValidators[i]];
                 pendingReward[address(_c)] = pendingReward[address(_c)].add(_firstPart);
             }
             _left = _left.sub(_firstPart.mul(backupValidators.length));
@@ -248,7 +248,7 @@ contract Validator is Params {
 
             uint _thirdPart = _left.sub(_secondPartTotal).div(activeValidators.length);
             for (uint8 i = 0; i < activeValidators.length; i++) {
-                ICandidate _c = candidates[activeValidators[i]];
+                ICandidatePool _c = candidates[activeValidators[i]];
                 if (_totalVote > 0) {
                     uint _secondPart = _c.totalVote().mul(_secondPartTotal).div(_totalVote);
                     pendingReward[address(_c)] = pendingReward[address(_c)].add(_secondPart).add(_thirdPart);
@@ -267,23 +267,23 @@ contract Validator is Params {
         }
 
         pendingReward[msg.sender] = 0;
-        Candidate(msg.sender).updateReward{value : _amount}();
+        CandidatePool(msg.sender).updateReward{value : _amount}();
     }
 
     function improveRanking()
     external
     onlyRegistered {
-        ICandidate _candidate = ICandidate(msg.sender);
+        ICandidatePool _candidate = ICandidatePool(msg.sender);
         require(_candidate.state() == State.Ready, "Incorrect state");
 
         SortedLinkedList.List storage _list = topCandidates[_candidate.cType()];
-        _list.improveRanking(ICandidate(msg.sender));
+        _list.improveRanking(ICandidatePool(msg.sender));
     }
 
     function lowerRanking()
     external
     onlyRegistered {
-        ICandidate _candidate = ICandidate(msg.sender);
+        ICandidatePool _candidate = ICandidatePool(msg.sender);
         require(_candidate.state() == State.Ready, "Incorrect state");
 
         SortedLinkedList.List storage _list = topCandidates[_candidate.cType()];
@@ -293,7 +293,7 @@ contract Validator is Params {
     function removeRanking()
     external
     onlyRegistered {
-        ICandidate _candidate = ICandidate(msg.sender);
+        ICandidatePool _candidate = ICandidatePool(msg.sender);
 
         SortedLinkedList.List storage _list = topCandidates[_candidate.cType()];
         _list.removeRanking(_candidate);
@@ -302,7 +302,7 @@ contract Validator is Params {
     function removeValidatorIncoming(address _candidate)
     external
     onlyPunishContract {
-        ICandidate _canContract = candidates[_candidate];
+        ICandidatePool _canContract = candidates[_candidate];
         pendingReward[address(_canContract)] = 0;
     }
 }

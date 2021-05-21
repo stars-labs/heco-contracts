@@ -10,7 +10,7 @@ import "../../library/SafeMath.sol";
 import "../interfaces/ICandidate.sol";
 import "../interfaces/IValidator.sol";
 
-contract MockCandidate is Params {
+contract MockCandidatePool is Params {
     using SafeMath for uint;
 
     IValidator pool;
