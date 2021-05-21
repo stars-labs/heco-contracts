@@ -91,7 +91,8 @@ contract("Candidate test", accounts => {
         try {
            await candidate.confirmPercentChange({from: accounts[1]})
         }catch(e) {
-            assert(e.message.search('Invalid percent') >= 0, 'invalid confirm percent change')
+            assert(e, 'invalid confirm percent change')
+            // assert(e.message.search('Invalid percent') >= 0, 'invalid confirm percent change')
         }
 
 

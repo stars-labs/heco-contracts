@@ -25,7 +25,6 @@ contract Validator is Params {
 
     mapping(address => uint8) actives;
 
-    // candidate address => contract address
     mapping(address => ICandidatePool) public candidates;
 
     mapping(address => uint) public pendingReward;
@@ -57,9 +56,10 @@ contract Validator is Params {
     function initialize(address[] memory _candidates, address[] memory _manager, address _admin)
     external
     onlyNotInitialized {
-        initialized = true;
         require(_candidates.length > 0 && _candidates.length == _manager.length, "Invalid params");
         require(_admin != address(0), "Invalid admin address");
+
+        initialized = true;
         admin = _admin;
 
         count[CandidateType.Pos] = 0;
@@ -92,6 +92,7 @@ contract Validator is Params {
     external
     onlyAdmin {
         require(_posCount + _poaCount == MaxValidators, "Invalid params");
+        require(_posBackup <= _posCount && _poaBackup <= _poaCount, "Invalid backup counts");
 
         count[CandidateType.Pos] = _posCount;
         count[CandidateType.Poa] = _poaCount;
@@ -120,7 +121,7 @@ contract Validator is Params {
     function updateCandidateState(address _candidate, bool pause)
     external
     onlyAdmin {
-        require(address(candidates[_candidate]) != address(0), "Corresponding candidate not found");
+        require(candidates[_candidate] != ICandidatePool(0), "Corresponding candidate not found");
         candidates[_candidate].switchState(pause);
     }
 
@@ -148,7 +149,6 @@ contract Validator is Params {
         for (uint8 i = 0; i < _types.length; i++) {
             CandidateType _type = _types[i];
             SortedLinkedList.List storage _list = topCandidates[_type];
-
 
             uint8 _size = count[_type];
             ICandidatePool cur = _list.head;
@@ -184,20 +184,19 @@ contract Validator is Params {
             actives[activeValidators[i]] = 1;
         }
 
-
         delete backupValidators;
 
         CandidateType[2] memory types = [CandidateType.Pos, CandidateType.Poa];
         for (uint8 i = 0; i < types.length; i++) {
-            uint8 size = backupCount[types[i]];
-            SortedLinkedList.List storage topList = topCandidates[types[i]];
-            ICandidatePool cur = topList.head;
-            while (size >= 0 && cur != ICandidatePool(0)) {
+            uint8 _size = backupCount[types[i]];
+            SortedLinkedList.List storage _topList = topCandidates[types[i]];
+            ICandidatePool cur = _topList.head;
+            while (_size >= 0 && cur != ICandidatePool(0)) {
                 if (actives[cur.candidate()] == 0) {
                     backupValidators.push(cur.candidate());
-                    size--;
+                    _size--;
                 }
-                cur = topList.next[cur];
+                cur = _topList.next[cur];
             }
         }
     }
@@ -276,7 +275,7 @@ contract Validator is Params {
         ICandidatePool _candidate = ICandidatePool(msg.sender);
         require(_candidate.state() == State.Ready, "Incorrect state");
 
-        SortedLinkedList.List storage _list = topCandidates[_candidate.cType()];
+        SortedLinkedList.List storage _list = topCandidates[_candidate.candidateType()];
         _list.improveRanking(ICandidatePool(msg.sender));
     }
 
@@ -286,7 +285,7 @@ contract Validator is Params {
         ICandidatePool _candidate = ICandidatePool(msg.sender);
         require(_candidate.state() == State.Ready, "Incorrect state");
 
-        SortedLinkedList.List storage _list = topCandidates[_candidate.cType()];
+        SortedLinkedList.List storage _list = topCandidates[_candidate.candidateType()];
         _list.lowerRanking(_candidate);
     }
 
@@ -295,7 +294,7 @@ contract Validator is Params {
     onlyRegistered {
         ICandidatePool _candidate = ICandidatePool(msg.sender);
 
-        SortedLinkedList.List storage _list = topCandidates[_candidate.cType()];
+        SortedLinkedList.List storage _list = topCandidates[_candidate.candidateType()];
         _list.removeRanking(_candidate);
     }
 

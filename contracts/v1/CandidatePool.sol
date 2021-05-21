@@ -14,7 +14,7 @@ import "./interfaces/IPunish.sol";
 contract CandidatePool is Params {
     using SafeMath for uint;
 
-    CandidateType public cType;
+    CandidateType public candidateType;
 
     State public state;
 
@@ -27,7 +27,7 @@ contract CandidatePool is Params {
     //base on 1000
     uint16 public percent;
 
-    uint public reward;
+    uint public candidateReward;
 
     mapping(address => VoterInfo) public voters;
 
@@ -63,8 +63,7 @@ contract CandidatePool is Params {
     }
 
     modifier onlyValidPercent(uint16 _percent) {
-        require(_percent > 0, "Invalid percent");
-        require(_percent <= 1000, "Invalid percent");
+        require(_percent > 0 && _percent <= 1000, "Invalid percent");
 
         _;
     }
@@ -76,9 +75,11 @@ contract CandidatePool is Params {
     event ChangeState(State state);
     event ExitVote();
     event WithdrawMargin(address indexed sender, uint amount);
-    event WithdrawReward(address indexed sender, uint amount);
+    event WithdrawCandidateReward(address indexed sender, uint amount);
+    event WithdrawVoteReward(address indexed sender, uint amount);
     event Deposit(address indexed sender, uint amount);
     event Withdraw(address indexed sender, uint amount);
+    event Punish(address indexed candidate, uint amount);
 
 
     constructor(address _miner, address _manager, uint8 _percent, CandidateType _type, State _state)
@@ -90,7 +91,7 @@ contract CandidatePool is Params {
         candidate = _miner;
         manager = _manager;
         percent = _percent;
-        cType = _type;
+        candidateType = _type;
         state = _state;
     }
 
@@ -145,7 +146,7 @@ contract CandidatePool is Params {
         emit AddMargin(msg.sender, msg.value);
 
         uint minMargin;
-        if (cType == CandidateType.Poa) {
+        if (candidateType == CandidateType.Poa) {
             minMargin = PoaMinMargin;
         } else {
             minMargin = PosMinMargin;
@@ -180,10 +181,14 @@ contract CandidatePool is Params {
     onlyPunishContract {
         require(margin >= PunishAmount, "No enough margin left");
         lastPunishedBlk = block.number;
+
         state = State.Jail;
+        emit ChangeState(state);
         validator.removeRanking();
+
         margin -= PunishAmount;
         address(0).transfer(PunishAmount);
+        emit Punish(candidate, PunishAmount);
 
         return;
     }
@@ -215,29 +220,32 @@ contract CandidatePool is Params {
     }
 
 
-    function withdrawReward()
+    function withdrawCandidateReward()
     external
     payable
     onlyManager {
         validator.withdrawReward();
-        require(reward > 0, "No more margin");
+        require(candidateReward > 0, "No more margin");
 
-        uint _amount = reward;
-        reward = 0;
+        uint _amount = candidateReward;
+        candidateReward = 0;
         msg.sender.transfer(_amount);
-        emit WithdrawReward(msg.sender, _amount);
+        emit WithdrawCandidateReward(msg.sender, _amount);
     }
 
     function updateReward()
     external
     payable
-    onlyValidatorsContract
-    {
+    onlyValidatorsContract {
         uint rewardForCandidate = msg.value.mul(percent).div(1000);
-        reward += rewardForCandidate;
-        accRewardPerShare = accRewardPerShare.add(msg.value.sub(rewardForCandidate).mul(1e18).div(totalVote));
+        candidateReward += rewardForCandidate;
+        accRewardPerShare = msg.value.sub(rewardForCandidate).mul(1e18).div(totalVote).add(accRewardPerShare);
 
-        require(reward + accRewardPerShare.mul(totalVote).div(1e18) <= address(this).balance, "Insufficient balance");
+        require(candidateReward + accRewardPerShare.mul(totalVote).div(1e18) <= address(this).balance, "Insufficient balance");
+    }
+
+    function getPendingReward(address _voter) external view returns (uint){
+        return accRewardPerShare.mul(voters[_voter].amount).div(1e18).sub(voters[_voter].rewardDebt);
     }
 
     function deposit()
@@ -263,7 +271,7 @@ contract CandidatePool is Params {
 
         if (_pendingReward > 0) {
             msg.sender.transfer(_pendingReward);
-            emit WithdrawReward(msg.sender, _pendingReward);
+            emit WithdrawVoteReward(msg.sender, _pendingReward);
         }
     }
 
@@ -275,7 +283,7 @@ contract CandidatePool is Params {
         uint _pendingReward = accRewardPerShare.mul(voters[msg.sender].amount).div(1e18).sub(voters[msg.sender].rewardDebt);
 
         totalVote = totalVote.sub(voters[msg.sender].amount);
-        uint _amount = voters[msg.sender].amount + _pendingReward;
+        uint _amount = voters[msg.sender].amount;
 
         voters[msg.sender].amount = 0;
         voters[msg.sender].rewardDebt = 0;
@@ -285,8 +293,9 @@ contract CandidatePool is Params {
         }
 
         if (_amount > 0) {
-            msg.sender.transfer(_amount);
+            msg.sender.transfer(_amount.add(_pendingReward));
             emit Withdraw(msg.sender, _amount);
+            emit WithdrawVoteReward(msg.sender, _pendingReward);
         }
     }
 }

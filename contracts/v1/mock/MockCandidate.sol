@@ -15,7 +15,7 @@ contract MockCandidatePool is Params {
 
     IValidator pool;
 
-    CandidateType public cType;
+    CandidateType public candidateType;
 
     State public state;
 
@@ -33,7 +33,7 @@ contract MockCandidatePool is Params {
         candidate = _miner;
         manager = _manager;
         percent = _percent;
-        cType = _type;
+        candidateType = _type;
         state = State.Ready;
     }
 
