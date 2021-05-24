@@ -2,14 +2,28 @@
 
 pragma solidity >= 0.6.0 < 0.8.0;
 
-// Developers manages the developer addresses
-contract Developers {
+// AddressList manages the developer addresses and black-list addresses
+// NOTE: Never change the sequence of storage variables.
+contract AddressList {
+
+    enum Direction {
+        From,
+        To,
+        Both
+    }
+    struct Blacklist {
+        address a;
+        Direction d;
+    }
+
     bool public initialized;
-    bool public enabled;
+    bool public devVerifyEnabled;
     address public admin;
     address public pendingAdmin;
 
     mapping(address => bool) private devs;
+
+    Blacklist[] blacks;
 
     event EnableStateChanged(bool indexed newState);
 
@@ -18,6 +32,9 @@ contract Developers {
 
     event DeveloperAdded(address indexed addr);
     event DeveloperRemoved(address indexed addr);
+
+    event BlackAddrAdded(address indexed addr, Direction d);
+    event BlackAddrRemoved(address indexed addr, Direction d);
 
     modifier onlyNotInitialized() {
         require(!initialized, "Already initialized");
@@ -34,9 +51,10 @@ contract Developers {
         initialized = true;
     }
 
-    function changeEnable(bool _isEnabled) external onlyAdmin {
-        require(enabled != _isEnabled, "Same value");
-        enabled = _isEnabled;
+    //Sets the developer verification flag
+    function setEnable(bool _isEnabled) external onlyAdmin {
+        require(devVerifyEnabled != _isEnabled, "Same value");
+        devVerifyEnabled = _isEnabled;
         emit EnableStateChanged(_isEnabled);
     }
 
@@ -67,5 +85,31 @@ contract Developers {
 
     function isDeveloper(address addr) view external returns (bool) {
         return devs[addr];
+    }
+
+    function getBlacklist() view external returns (Blacklist[] memory) {
+        return blacks;
+    }
+
+    function addBlacklist(address a, Direction d) external onlyAdmin {
+        // add with NO check
+        Blacklist memory b = new Blacklist(a,d);
+        blacks.push(b);
+
+        emit BlackAddrAdded(a,d);
+    }
+
+    function removeBlacklist(address a, Direction d) external onlyAdmin {
+        for (uint i = 0; i < blacks.length; i++) {
+            if (blacks[i].a == a && (d == Direction.Both || blacks[i].d == d)) {
+                Direction originD = blacks[i].d;
+                if (i != blacks.length - 1) {
+                    blacks[i] = blacks[blacks.length - 1];
+                }
+                blacks.pop();
+
+                emit BlackAddrRemoved(a,originD);
+            }
+        }
     }
 }
