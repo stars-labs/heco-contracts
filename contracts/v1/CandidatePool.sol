@@ -239,7 +239,9 @@ contract CandidatePool is Params {
     onlyValidatorsContract {
         uint rewardForCandidate = msg.value.mul(percent).div(1000);
         candidateReward += rewardForCandidate;
-        accRewardPerShare = msg.value.sub(rewardForCandidate).mul(1e18).div(totalVote).add(accRewardPerShare);
+        if (totalVote > 0) {
+            accRewardPerShare = msg.value.sub(rewardForCandidate).mul(1e18).div(totalVote).add(accRewardPerShare);
+        }
 
         require(candidateReward + accRewardPerShare.mul(totalVote).div(1e18) <= address(this).balance, "Insufficient balance");
     }

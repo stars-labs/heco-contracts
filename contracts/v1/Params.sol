@@ -8,9 +8,9 @@ contract Params {
 
     // System contracts
     IValidator 
-        public constant validator = IValidator(0x000000000000000000000000000000000000f000);
+        public constant validator = IValidator(0x000000000000000000000000000000000000F005);
     IPunish 
-        public constant punishcontract = IPunish(0x000000000000000000000000000000000000F001);
+        public constant punishcontract = IPunish(0x000000000000000000000000000000000000F006);
 
     // System params
     uint16 public constant MaxValidators = 21;
