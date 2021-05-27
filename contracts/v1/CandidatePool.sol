@@ -189,16 +189,19 @@ contract CandidatePool is Params {
     function punish()
     external
     onlyPunishContract {
-        require(margin >= PunishAmount, "No enough margin left");
+        //        require(margin >= PunishAmount, "No enough margin left");
         punishBlk = block.number;
 
         state = State.Jail;
         emit ChangeState(state);
         validatorContract.removeRanking();
 
-        margin -= PunishAmount;
-        address(0).transfer(PunishAmount);
-        emit Punish(candidate, PunishAmount);
+        uint _punishAmount = margin >= PunishAmount ? PunishAmount : margin;
+        if (_punishAmount > 0) {
+            margin -= _punishAmount;
+            address(0).transfer(_punishAmount);
+            emit Punish(candidate, _punishAmount);
+        }
 
         return;
     }
