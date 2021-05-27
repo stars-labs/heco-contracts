@@ -49,11 +49,16 @@ contract AddressList {
         initialized = true;
     }
 
-    //Sets the developer verification flag
-    function setEnable(bool _isEnabled) external onlyAdmin {
-        require(devVerifyEnabled != _isEnabled, "Same value");
-        devVerifyEnabled = _isEnabled;
-        emit EnableStateChanged(_isEnabled);
+    function enableDevVerify() external onlyAdmin {
+        require(devVerifyEnabled == false, "already enabled");
+        devVerifyEnabled=true;
+        emit EnableStateChanged(true);
+    }
+
+    function disableDevVerify() external onlyAdmin {
+        require(devVerifyEnabled, "already disabled");
+        devVerifyEnabled=false;
+        emit EnableStateChanged(false);
     }
 
     function commitChangeAdmin(address newAdmin) external onlyAdmin {
