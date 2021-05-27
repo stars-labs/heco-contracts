@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.0 <0.8.0;
+
 import "./interfaces/IValidator.sol";
 import "./interfaces/IPunish.sol";
 
@@ -7,10 +8,8 @@ contract Params {
     bool public initialized;
 
     // System contracts
-    IValidator 
-        public constant validator = IValidator(0x000000000000000000000000000000000000F005);
-    IPunish 
-        public constant punishcontract = IPunish(0x000000000000000000000000000000000000F006);
+    IValidator public constant validatorContract = IValidator(0x000000000000000000000000000000000000F005);
+    IPunish public constant punishContract = IPunish(0x000000000000000000000000000000000000F006);
 
     // System params
     uint16 public constant MaxValidators = 21;
@@ -39,7 +38,7 @@ contract Params {
     }
 
     modifier onlyPunishContract() {
-        require(msg.sender == address(punishcontract), "Punish contract only");
+        require(msg.sender == address(punishContract), "Punish contract only");
         _;
     }
 
@@ -49,10 +48,7 @@ contract Params {
     }
 
     modifier onlyValidatorsContract() {
-        require(
-            msg.sender == address(validator),
-            "Validators contract only"
-        );
+        require(msg.sender == address(validatorContract), "Validators contract only");
         _;
     }
 }

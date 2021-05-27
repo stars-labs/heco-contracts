@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.0 <0.8.0;
 
-import "../interfaces/ICandidate.sol";
+import "../interfaces/ICandidatePool.sol";
 import "../library/SortedList.sol";
 
 contract MockList {

@@ -12,11 +12,6 @@ interface ICandidatePool {
     function switchState(bool pause) external;
 
     function punish() external;
-
-    function addMargin() payable external;
-
-    function deposit() payable external;
-
 }
 
     enum CandidateType {

@@ -7,12 +7,15 @@ import "./Params.sol";
 import "./mock/MockParams.sol";
 // #endif
 import "../library/SafeMath.sol";
-import "./interfaces/ICandidate.sol";
+import "./interfaces/ICandidatePool.sol";
 import "./interfaces/IValidator.sol";
 import "./interfaces/IPunish.sol";
 
 contract CandidatePool is Params {
     using SafeMath for uint;
+
+    uint constant PERCENT_BASE = 1000;
+    uint constant COEFFICIENT = 1e18;
 
     CandidateType public candidateType;
 
@@ -27,19 +30,21 @@ contract CandidatePool is Params {
     //base on 1000
     uint16 public percent;
 
-    uint public candidateReward;
+    PercentChange public pendingPercentChange;
+
+    //reward for this pool not for voters
+    uint public poolReward;
 
     mapping(address => VoterInfo) public voters;
 
+    //use to calc voter's reward
     uint public accRewardPerShare;
 
     uint public totalVote;
 
-    uint public lastPunishedBlk;
+    uint public punishBlk;
 
     uint public exitBlk;
-
-    PercentChange public percentChange;
 
     struct VoterInfo {
         uint amount;
@@ -49,7 +54,7 @@ contract CandidatePool is Params {
 
     struct PercentChange {
         uint16 newPercent;
-        uint lastCommitBlk;
+        uint submitBlk;
     }
 
     modifier onlyCandidate() {
@@ -63,19 +68,19 @@ contract CandidatePool is Params {
     }
 
     modifier onlyValidPercent(uint16 _percent) {
-        require(_percent > 0 && _percent <= 1000, "Invalid percent");
-
+        //zero represents null value, trade as invalid
+        require(_percent > 0 && _percent <= PERCENT_BASE, "Invalid percent");
         _;
     }
 
     event ChangeManager(address indexed manager);
-    event UpdatingPercent(uint16 indexed percent);
+    event SubmitPercentChange(uint16 indexed percent);
     event ConfirmPercentChange(uint16 indexed percent);
     event AddMargin(address indexed sender, uint amount);
-    event ChangeState(State state);
-    event ExitVote();
+    event ChangeState(State indexed state);
+    event Exit(address indexed candidate);
     event WithdrawMargin(address indexed sender, uint amount);
-    event WithdrawCandidateReward(address indexed sender, uint amount);
+    event WithdrawPoolReward(address indexed sender, uint amount);
     event WithdrawVoteReward(address indexed sender, uint amount);
     event Deposit(address indexed sender, uint amount);
     event Withdraw(address indexed sender, uint amount);
@@ -95,12 +100,13 @@ contract CandidatePool is Params {
         state = _state;
     }
 
+    // only for chain hard fork to init poa validators
     function initialize()
     external
     onlyValidatorsContract
     onlyNotInitialized {
         initialized = true;
-        validator.improveRanking();
+        validatorContract.improveRanking();
     }
 
 
@@ -112,25 +118,25 @@ contract CandidatePool is Params {
     }
 
     //base on 1000
-    function updatePercent(uint16 _percent)
+    function submitPercentChange(uint16 _percent)
     external
     onlyManager
     onlyValidPercent(_percent) {
-        percentChange.newPercent = _percent;
-        percentChange.lastCommitBlk = block.number;
+        pendingPercentChange.newPercent = _percent;
+        pendingPercentChange.submitBlk = block.number;
 
-        emit UpdatingPercent(_percent);
+        emit SubmitPercentChange(_percent);
     }
 
     function confirmPercentChange()
     external
     onlyManager
-    onlyValidPercent(percentChange.newPercent) {
-        require(percentChange.lastCommitBlk > 0 && block.number - percentChange.lastCommitBlk >= LockPeriod, "Interval not long enough");
+    onlyValidPercent(pendingPercentChange.newPercent) {
+        require(pendingPercentChange.submitBlk > 0 && block.number - pendingPercentChange.submitBlk > LockPeriod, "Interval not long enough");
 
-        percent = percentChange.newPercent;
-        percentChange.newPercent = 0;
-        percentChange.lastCommitBlk = 0;
+        percent = pendingPercentChange.newPercent;
+        pendingPercentChange.newPercent = 0;
+        pendingPercentChange.submitBlk = 0;
 
         emit ConfirmPercentChange(percent);
     }
@@ -139,8 +145,10 @@ contract CandidatePool is Params {
     external
     payable
     onlyManager {
-        require(state == State.Idle || (state == State.Jail && block.number - lastPunishedBlk > JailPeriod), "Incorrect state");
-        require(exitBlk == 0 || block.number - exitBlk >= LockPeriod, "Interval not long enough");
+        require(state == State.Idle || (state == State.Jail && block.number - punishBlk > JailPeriod), "Incorrect state");
+        require(exitBlk == 0 || block.number - exitBlk > LockPeriod, "Interval not long enough");
+        require(msg.value > 0, "Value should not be zero");
+
         margin += msg.value;
 
         emit AddMargin(msg.sender, msg.value);
@@ -154,7 +162,7 @@ contract CandidatePool is Params {
 
         if (margin >= minMargin) {
             state = State.Ready;
-            punishcontract.cleanPunishRecord(candidate);
+            punishContract.cleanPunishRecord(candidate);
             emit ChangeState(state);
         }
     }
@@ -162,14 +170,16 @@ contract CandidatePool is Params {
     function switchState(bool pause)
     external
     onlyValidatorsContract {
-        if (pause && (state == State.Idle || state == State.Ready)) {
+        if (pause) {
+            require(state == State.Idle || state == State.Ready, "Incorrect state");
+
             state = State.Pause;
             emit ChangeState(state);
-            validator.removeRanking();
+            validatorContract.removeRanking();
             return;
-        }
+        } else {
+            require(state == State.Pause, "Incorrect state");
 
-        if (!pause && state == State.Pause) {
             state = State.Idle;
             emit ChangeState(state);
             return;
@@ -180,11 +190,11 @@ contract CandidatePool is Params {
     external
     onlyPunishContract {
         require(margin >= PunishAmount, "No enough margin left");
-        lastPunishedBlk = block.number;
+        punishBlk = block.number;
 
         state = State.Jail;
         emit ChangeState(state);
-        validator.removeRanking();
+        validatorContract.removeRanking();
 
         margin -= PunishAmount;
         address(0).transfer(PunishAmount);
@@ -202,15 +212,15 @@ contract CandidatePool is Params {
         state = State.Idle;
         emit ChangeState(state);
 
-        validator.removeRanking();
-        emit ExitVote();
+        validatorContract.removeRanking();
+        emit Exit(candidate);
     }
 
     function withdrawMargin()
     external
     onlyManager {
         require(state == State.Idle, "Incorrect state");
-        require(block.number - exitBlk >= LockPeriod, "Interval not long enough");
+        require(block.number - exitBlk > LockPeriod, "Interval not long enough");
         require(margin > 0, "No more margin");
 
         uint _amount = margin;
@@ -219,56 +229,56 @@ contract CandidatePool is Params {
         emit WithdrawMargin(msg.sender, _amount);
     }
 
-
-    function withdrawCandidateReward()
-    external
-    payable
-    onlyManager {
-        validator.withdrawReward();
-        require(candidateReward > 0, "No more margin");
-
-        uint _amount = candidateReward;
-        candidateReward = 0;
-        msg.sender.transfer(_amount);
-        emit WithdrawCandidateReward(msg.sender, _amount);
-    }
-
-    function updateReward()
+    function receiveReward()
     external
     payable
     onlyValidatorsContract {
-        uint rewardForCandidate = msg.value.mul(percent).div(1000);
-        candidateReward += rewardForCandidate;
+        uint _rewardForPool = msg.value.mul(percent).div(PERCENT_BASE);
+        poolReward += _rewardForPool;
         if (totalVote > 0) {
-            accRewardPerShare = msg.value.sub(rewardForCandidate).mul(1e18).div(totalVote).add(accRewardPerShare);
+            accRewardPerShare = msg.value.sub(_rewardForPool).mul(COEFFICIENT).div(totalVote).add(accRewardPerShare);
         }
 
-        require(candidateReward + accRewardPerShare.mul(totalVote).div(1e18) <= address(this).balance, "Insufficient balance");
+        //TODO remove it or not ?
+        require(poolReward + accRewardPerShare.mul(totalVote).div(COEFFICIENT) <= address(this).balance, "Insufficient balance");
+    }
+
+    function withdrawPoolReward()
+    external
+    payable
+    onlyManager {
+        validatorContract.withdrawReward();
+        require(poolReward > 0, "No more reward");
+
+        uint _amount = poolReward;
+        poolReward = 0;
+        msg.sender.transfer(_amount);
+        emit WithdrawPoolReward(msg.sender, _amount);
     }
 
     function getPendingReward(address _voter) external view returns (uint){
-        return accRewardPerShare.mul(voters[_voter].amount).div(1e18).sub(voters[_voter].rewardDebt);
+        return accRewardPerShare.mul(voters[_voter].amount).div(COEFFICIENT).sub(voters[_voter].rewardDebt);
     }
 
     function deposit()
     external
     payable {
-        validator.withdrawReward();
+        validatorContract.withdrawReward();
 
-        uint _pendingReward = accRewardPerShare.mul(voters[msg.sender].amount).div(1e18).sub(voters[msg.sender].rewardDebt);
+        uint _pendingReward = accRewardPerShare.mul(voters[msg.sender].amount).div(COEFFICIENT).sub(voters[msg.sender].rewardDebt);
 
         if (msg.value > 0) {
             voters[msg.sender].amount = voters[msg.sender].amount.add(msg.value);
             voters[msg.sender].lastVoteBlk = block.number;
-            voters[msg.sender].rewardDebt = voters[msg.sender].amount.mul(accRewardPerShare).div(1e18);
+            voters[msg.sender].rewardDebt = voters[msg.sender].amount.mul(accRewardPerShare).div(COEFFICIENT);
             totalVote = totalVote.add(msg.value);
+            emit Deposit(msg.sender, msg.value);
 
             if (state == State.Ready) {
-                validator.improveRanking();
+                validatorContract.improveRanking();
             }
-            emit Deposit(msg.sender, msg.value);
         } else {
-            voters[msg.sender].rewardDebt = voters[msg.sender].amount.mul(accRewardPerShare).div(1e18);
+            voters[msg.sender].rewardDebt = voters[msg.sender].amount.mul(accRewardPerShare).div(COEFFICIENT);
         }
 
         if (_pendingReward > 0) {
@@ -279,10 +289,10 @@ contract CandidatePool is Params {
 
     function withdraw()
     external {
-        require(block.number - voters[msg.sender].lastVoteBlk >= LockPeriod, "Interval too small");
-        validator.withdrawReward();
+        require(block.number - voters[msg.sender].lastVoteBlk > LockPeriod, "Interval too small");
+        validatorContract.withdrawReward();
 
-        uint _pendingReward = accRewardPerShare.mul(voters[msg.sender].amount).div(1e18).sub(voters[msg.sender].rewardDebt);
+        uint _pendingReward = accRewardPerShare.mul(voters[msg.sender].amount).div(COEFFICIENT).sub(voters[msg.sender].rewardDebt);
 
         totalVote = totalVote.sub(voters[msg.sender].amount);
         uint _amount = voters[msg.sender].amount;
@@ -291,7 +301,7 @@ contract CandidatePool is Params {
         voters[msg.sender].rewardDebt = 0;
 
         if (state == State.Ready) {
-            validator.lowerRanking();
+            validatorContract.lowerRanking();
         }
 
         if (_amount > 0) {

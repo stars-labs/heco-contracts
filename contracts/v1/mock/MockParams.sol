@@ -8,10 +8,10 @@ contract Params {
     bool public initialized;
 
     // System contracts
-    IValidator 
-        public validator;
-    IPunish 
-        public punishcontract;
+    IValidator
+        public validatorContract;
+    IPunish
+        public punishContract;
 
     // System params
     uint16 public constant MaxValidators = 21;
@@ -54,9 +54,9 @@ contract Params {
         _;
     }
 
-    function setAddress(address _val, address _punish) 
+    function setAddress(address _val, address _punish)
     external {
-        validator = IValidator(_val);
-        punishcontract = IPunish(_punish);
+        validatorContract = IValidator(_val);
+        punishContract = IPunish(_punish);
     }
 }

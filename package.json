@@ -23,7 +23,7 @@
   "scripts": {
     "test": "NET=devnet yarn run hardhat test test/v1/*",
     "clean": "yarn run hardhat clean",
-    "compile": "yarn run hardhat compile"
+    "compile": "NET=mainnet yarn run hardhat compile"
   },
   "author": "",
   "license": "ISC"

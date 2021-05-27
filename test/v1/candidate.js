@@ -24,7 +24,7 @@ contract("Candidate test", accounts => {
         })
         assert(tx.receipt.status)
 
-        let candidate = await Candidate.at(await validator.candidates(accounts[0]))
+        let candidate = await Candidate.at(await validator.candidatePools(accounts[0]))
         await candidate.setAddress(validator.address, punish.address)
 
         assert.equal(await candidate.state(), 0)
@@ -35,7 +35,7 @@ contract("Candidate test", accounts => {
     //         ['changeManager', [accounts[0]]],
     //     ]
 
-    //     let candidate = await Candidate.at(await validator.candidates(accounts[0]))
+    //     let candidate = await Candidate.at(await validator.candidatePools(accounts[0]))
 
     //     for(let input of inputs) {
     //         try {
@@ -49,14 +49,14 @@ contract("Candidate test", accounts => {
 
 
     it("change manager", async() => {
-        let candidate = await Candidate.at(await validator.candidates(accounts[0]))
+        let candidate = await Candidate.at(await validator.candidatePools(accounts[0]))
 
         let tx = await candidate.changeManager(accounts[1], {from: accounts[0]})
         truffleAssert.eventEmitted(tx, "ChangeManager", {manager: accounts[1]})
     })
 
     it("add margin", async() => {
-        let candidate = await Candidate.at(await validator.candidates(accounts[0]))
+        let candidate = await Candidate.at(await validator.candidatePools(accounts[0]))
         let tx = await candidate.addMargin({
             from: accounts[1],
             value: web3.utils.toWei("1", "ether")
@@ -80,9 +80,9 @@ contract("Candidate test", accounts => {
     })
 
     it("change percent", async() => {
-        let candidate = await Candidate.at(await validator.candidates(accounts[0]))
-        let tx = await candidate.updatePercent(80, {from: accounts[1]})
-        truffleAssert.eventEmitted(tx, 'UpdatingPercent', ev => ev.percent.toString() == 80)
+        let candidate = await Candidate.at(await validator.candidatePools(accounts[0]))
+        let tx = await candidate.submitPercentChange(80, {from: accounts[1]})
+        truffleAssert.eventEmitted(tx, 'SubmitPercentChange', ev => ev.percent.toString() == 80)
 
         tx = await candidate.confirmPercentChange({from: accounts[1]})
         truffleAssert.eventEmitted(tx, 'ConfirmPercentChange', ev => ev.percent.toString() == 80)
@@ -99,29 +99,29 @@ contract("Candidate test", accounts => {
     })
 
     it("change percent", async () => {
-        let candidate = await Candidate.at(await validator.candidates(accounts[0]))
+        let candidate = await Candidate.at(await validator.candidatePools(accounts[0]))
         try {
-            await  candidate.updatePercent(0, {from: accounts[0]});
+            await  candidate.submitPercentChange(0, {from: accounts[0]});
         }catch(e) {
             assert(e.message, 'from invalid account')
             // assert(e.message.search('Only manager allowed') >= 0, 'from invalid account')
         }
 
         try {
-            await candidate.updatePercent(0, {from: accounts[1]});
+            await candidate.submitPercentChange(0, {from: accounts[1]});
         }catch(e) {
             assert(e.message, 'change percent to 0')
             // assert(e.message.search('Invalid percent') >= 0, 'change percent to 0')
         }
 
         try {
-            await candidate.updatePercent(1001, {from: accounts[1]});
+            await candidate.submitPercentChange(1001, {from: accounts[1]});
         }catch(e) {
             assert(e.message, 'change percent to 1001')
             // assert(e.message.search('Invalid percent') >= 0, 'change percent to 1001')
         }
 
-        let tx = await candidate.updatePercent(1, {from: accounts[1]});
+        let tx = await candidate.submitPercentChange(1, {from: accounts[1]});
         assert.equal(tx.receipt.status, true, 'change percent to 1')
 
         await candidate.confirmPercentChange({from: accounts[1]});
@@ -130,7 +130,7 @@ contract("Candidate test", accounts => {
 
 
     it("deposit", async() => {
-        let candidate = await Candidate.at(await validator.candidates(accounts[0]))
+        let candidate = await Candidate.at(await validator.candidatePools(accounts[0]))
 
         params = [
             [1, 100],
@@ -151,11 +151,11 @@ contract("Candidate test", accounts => {
     it("reward", async() => {
         await validator.distributeBlockReward({from: accounts[0], gas: 400000, value: web3.utils.toWei("1", "ether")})
         assert.equal(web3.utils.toWei("1", "ether"), await web3.eth.getBalance(validator.address))
-        assert.equal(web3.utils.toWei("1", "ether"), await validator.pendingReward(await validator.candidates(accounts[0])))
+        assert.equal(web3.utils.toWei("1", "ether"), await validator.pendingReward(await validator.candidatePools(accounts[0])))
     })
 
     it('switch state', async() => {
-        let candidate = await Candidate.at(await validator.candidates(accounts[0]))
+        let candidate = await Candidate.at(await validator.candidatePools(accounts[0]))
         assert.equal(await candidate.state() , 1, 'in ready state')
         await candidate.switchState(true)
         assert.equal(await candidate.state() , 2, 'in pause state')
@@ -164,7 +164,7 @@ contract("Candidate test", accounts => {
     })
 
     it('punish', async() => {
-        let candidate = await Candidate.at(await validator.candidates(accounts[0]))
+        let candidate = await Candidate.at(await validator.candidatePools(accounts[0]))
         let balanceBefore = await web3.eth.getBalance(candidate.address);
         let marginBefore = await candidate.margin();
 
@@ -176,7 +176,7 @@ contract("Candidate test", accounts => {
     })
 
     it("exit", async() => {
-        let candidate = await Candidate.at(await validator.candidates(accounts[0]))
+        let candidate = await Candidate.at(await validator.candidatePools(accounts[0]))
         try {
             await candidate.exit({from: accounts[1]})
         }catch(e) {
@@ -194,7 +194,7 @@ contract("Candidate test", accounts => {
     })
 
     it("withdraw margin", async() => {
-        let candidate = await Candidate.at(await validator.candidates(accounts[0]))
+        let candidate = await Candidate.at(await validator.candidatePools(accounts[0]))
         let margin = await candidate.margin()
 
         let balanceBefore = await web3.eth.getBalance(accounts[1])

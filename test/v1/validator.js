@@ -54,7 +54,7 @@ contract("Validator test", accounts => {
         try {
             await validator.updateParams(1, 1, 1, 1, {from: accounts[0]})
         } catch (e) {
-            assert(e.message.search('Invalid params') >= 0, 'invalid params')
+            assert(e.message.search('Invalid validator counts') >= 0, 'invalid validator count')
         }
 
         let tx = await validator.updateParams(20, 20, 1, 1, {from: accounts[0]})
@@ -83,7 +83,7 @@ contract("Validator test", accounts => {
 
         truffleAssert.eventEmitted(tx, 'AddCandidate', {
             candidate: accounts[0],
-            contractAddress: await validator.candidates(accounts[0])
+            contractAddress: await validator.candidatePools(accounts[0])
         })
 
         assert(tx.receipt.status)
@@ -95,21 +95,21 @@ contract("Validator test", accounts => {
         try {
             await c.changeVoteAndRanking(await validator.address, 100)
         } catch (e) {
-            assert(e.message.search('Candidate not registered') >= 0)
+            assert(e.message.search('Candidate pool not registered') >= 0, "change vote to 100")
         }
 
         try {
             await c.changeVoteAndRanking(await validator.address, 0)
         } catch (e) {
-            assert(e.message.search('Candidate not registered') >= 0)
+            assert(e.message.search('Candidate pool not registered') >= 0, "change vote to 0")
         }
     })
 
     it('updateActiveValidatorSet', async () => {
         let vals = await validator.getTopValidators()
         await validator.updateActiveValidatorSet(vals, 200)
-        assert.equal(await validator.getActiveValidatorsCount(), 1, 'active validators length')
-        assert.equal(await validator.getBackupValidatorsCount(), 4, 'backup validators length')
+        assert.equal((await validator.getActiveValidators()).length, 1, 'active validators length')
+        assert.equal((await validator.getBackupValidators()).length, 4, 'backup validators length')
     })
 
     it('distributeBlockReward', async () => {
@@ -118,8 +118,8 @@ contract("Validator test", accounts => {
             gas: 2000000
         })
 
-        let candidate0 = await Candidate.at(await validator.candidates(accounts[0]))
-        let candidate1 = await Candidate.at(await validator.candidates(accounts[1]))
+        let candidate0 = await Candidate.at(await validator.candidatePools(accounts[0]))
+        let candidate1 = await Candidate.at(await validator.candidatePools(accounts[1]))
 
         for (let can of [candidate0, candidate1]) {
             await can.setAddress(validator.address, punish.address)
@@ -131,24 +131,24 @@ contract("Validator test", accounts => {
 
         let vals = await validator.getTopValidators()
         await validator.updateActiveValidatorSet(vals, 200)
-        assert.equal(await validator.getActiveValidatorsCount(), 3, 'active validators length')
-        assert.equal(await validator.getBackupValidatorsCount(), 4, 'backup validators length')
+        assert.equal((await validator.getActiveValidators()).length, 3, 'active validators length')
+        assert.equal((await validator.getBackupValidators()).length, 4, 'backup validators length')
 
         await validator.distributeBlockReward({from: accounts[0], value: web3.utils.toWei("100", "ether")})
 
         //backup vals
         for (let i = 11; i < 15; i++) {
-            let candidate = await validator.candidates(accounts[i])
-            //100 * 0.2 / 4
-            assert.equal((await validator.pendingReward(candidate)).toString(), web3.utils.toWei(new BN(100), "ether").mul(new BN(2)).div(new BN(40)).toString())
+            let candidate = await validator.candidatePools(accounts[i])
+            //100 * 0.1 / 4
+            assert.equal((await validator.pendingReward(candidate)).toString(), web3.utils.toWei(new BN(100), "ether").mul(new BN(1)).div(new BN(40)).toString())
         }
 
-        //no staking   100 * 0.4 / 3
-        assert.equal((await validator.pendingReward(await validator.candidates(accounts[10]))).toString(), web3.utils.toWei(new BN(100), "ether").mul(new BN(4)).div(new BN(30)).toString())
+        //no staking   100 * 0.5 / 3
+        assert.equal((await validator.pendingReward(await validator.candidatePools(accounts[10]))).toString(), web3.utils.toWei(new BN(100), "ether").mul(new BN(5)).div(new BN(30)).toString())
 
-        //staking  100 * 0.4 / 3 + 100 * 0.4 / 2
-        assert.equal((await validator.pendingReward(await validator.candidates(accounts[0]))).toString(),
-            web3.utils.toWei(new BN(100), "ether").mul(new BN(4)).div(new BN(30)).add(
+        //staking  100 * 0.5 / 3 + 100 * 0.4 / 2
+        assert.equal((await validator.pendingReward(await validator.candidatePools(accounts[0]))).toString(),
+            web3.utils.toWei(new BN(100), "ether").mul(new BN(5)).div(new BN(30)).add(
                 web3.utils.toWei(new BN(100), "ether").mul(new BN(4)).div(new BN(20))
             ).toString())
     })

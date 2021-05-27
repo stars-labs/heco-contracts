@@ -8,7 +8,7 @@ import "./MockParams.sol";
 // #endif
 import "../../library/SafeMath.sol";
 import "../library/SortedList.sol";
-import "../interfaces/ICandidate.sol";
+import "../interfaces/ICandidatePool.sol";
 import "../CandidatePool.sol";
 
 contract MockValidator is Params {
@@ -24,7 +24,7 @@ contract MockValidator is Params {
     address[] public backupValidators;
 
     // candidate address => contract address
-    mapping(address => ICandidatePool) public candidates;
+    mapping(address => ICandidatePool) public candidatePools;
 
     mapping(address => uint) public pendingReward;
 
@@ -41,10 +41,10 @@ contract MockValidator is Params {
     function addCandidate(address _candidate, address _manager, uint8 _percent, CandidateType _type)
     external
     returns (address) {
-        require(candidates[_candidate] == ICandidatePool(0), "Candidate already exists");
+        require(candidatePools[_candidate] == ICandidatePool(0), "Candidate already exists");
 
         CandidatePool _candidateContract = new CandidatePool(_candidate, _manager, _percent, _type, State.Idle);
-        candidates[_candidate] = ICandidatePool(address(_candidateContract));
+        candidatePools[_candidate] = ICandidatePool(address(_candidateContract));
 
         return address(_candidateContract);
     }
@@ -55,12 +55,12 @@ contract MockValidator is Params {
     {
         uint _total = 0;
         for (uint8 i = 0; i < activeValidators.length; i++) {
-            _total += candidates[activeValidators[i]].totalVote();
+            _total += candidatePools[activeValidators[i]].totalVote();
         }
 
         if (_total > 0) {
             for (uint8 i = 0; i < activeValidators.length; i++) {
-                ICandidatePool c = candidates[activeValidators[i]];
+                ICandidatePool c = candidatePools[activeValidators[i]];
                 pendingReward[address(c)] += c.totalVote().mul(msg.value).div(_total);
             }
         }
@@ -74,7 +74,7 @@ contract MockValidator is Params {
         }
 
         pendingReward[msg.sender] = 0;
-        CandidatePool(msg.sender).updateReward{value : _amount}();
+        CandidatePool(msg.sender).receiveReward{value : _amount}();
     }
 
     function updateActiveValidatorSet(address[] memory newSet) external {

@@ -5,7 +5,7 @@ import "./Params.sol";
 // #else
 import "./mock/MockParams.sol";
 // #endif
-import "./interfaces/ICandidate.sol";
+import "./interfaces/ICandidatePool.sol";
 import "./interfaces/IValidator.sol";
 
 contract Punish is Params {
@@ -61,12 +61,12 @@ contract Punish is Params {
         punishRecords[_val].missedBlocksCounter++;
 
         if (punishRecords[_val].missedBlocksCounter % removeThreshold == 0) {
-            ICandidatePool candidate = validator.candidates(_val);
-            candidate.punish();
+            ICandidatePool _pool = validatorContract.candidatePools(_val);
+            _pool.punish();
             // reset validator's missed blocks counter
             punishRecords[_val].missedBlocksCounter = 0;
         } else if (punishRecords[_val].missedBlocksCounter % punishThreshold == 0) {
-            validator.removeValidatorIncoming(_val);
+            validatorContract.removeValidatorIncoming(_val);
         }
 
         emit LogPunishValidator(_val, block.timestamp);
@@ -99,13 +99,13 @@ contract Punish is Params {
         emit LogDecreaseMissedBlocksCounter();
     }
 
-    // clean validator's punish record if one restake in
+    // clean validator's punish record if one vote in
     function cleanPunishRecord(address _val)
     external
     onlyInitialized
     returns (bool)
     {
-        require(address(validator.candidates(_val)) == msg.sender, "Candidate not registered");
+        require(address(validatorContract.candidatePools(_val)) == msg.sender, "Candidate not registered");
         if (punishRecords[_val].missedBlocksCounter != 0) {
             punishRecords[_val].missedBlocksCounter = 0;
         }
@@ -113,10 +113,10 @@ contract Punish is Params {
         // remove it out of array if exist
         if (punishRecords[_val].exist && punishValidators.length > 0) {
             if (punishRecords[_val].index != punishValidators.length - 1) {
-                address uval = punishValidators[punishValidators.length - 1];
-                punishValidators[punishRecords[_val].index] = uval;
+                address _tail = punishValidators[punishValidators.length - 1];
+                punishValidators[punishRecords[_val].index] = _tail;
 
-                punishRecords[uval].index = punishRecords[_val].index;
+                punishRecords[_tail].index = punishRecords[_val].index;
             }
             punishValidators.pop();
             punishRecords[_val].index = 0;

@@ -7,7 +7,7 @@ import "../Params.sol";
 import "./MockParams.sol";
 // #endif
 import "../../library/SafeMath.sol";
-import "../interfaces/ICandidate.sol";
+import "../interfaces/ICandidatePool.sol";
 import "../interfaces/IValidator.sol";
 
 contract MockCandidatePool is Params {
