@@ -28,7 +28,7 @@ contract VotePool is Params {
     uint public margin;
 
     //base on 1000
-    uint16 public percent;
+    uint public percent;
 
     PercentChange public pendingPercentChange;
 
@@ -54,7 +54,7 @@ contract VotePool is Params {
     }
 
     struct PercentChange {
-        uint16 newPercent;
+        uint newPercent;
         uint submitBlk;
     }
 
@@ -68,9 +68,9 @@ contract VotePool is Params {
         _;
     }
 
-    modifier onlyValidPercent(uint16 _percent) {
+    modifier onlyValidPercent(ValidatorType _type, uint _percent) {
         //zero represents null value, trade as invalid
-        if (validatorType == ValidatorType.Poa) {
+        if ( _type == ValidatorType.Poa) {
             require(_percent > 0 && _percent <= PERCENT_BASE, "Invalid percent");
         } else {
             require(_percent > 0 && _percent <= PERCENT_BASE.mul(3).div(10), "Invalid percent");
@@ -79,8 +79,8 @@ contract VotePool is Params {
     }
 
     event ChangeManager(address indexed manager);
-    event SubmitPercentChange(uint16 indexed percent);
-    event ConfirmPercentChange(uint16 indexed percent);
+    event SubmitPercentChange(uint indexed percent);
+    event ConfirmPercentChange(uint indexed percent);
     event AddMargin(address indexed sender, uint amount);
     event ChangeState(State indexed state);
     event Exit(address indexed validator);
@@ -92,12 +92,12 @@ contract VotePool is Params {
     event Punish(address indexed validator, uint amount);
 
 
-    constructor(address _validator, address _manager, uint8 _percent, ValidatorType _type, State _state)
+    constructor(address _validator, address _manager, uint _percent, ValidatorType _type, State _state)
     public
         // #if Mainnet
     onlyValidatorsContract
         // #endif
-    onlyValidPercent(_percent) {
+    onlyValidPercent(_type, _percent) {
         validator = _validator;
         manager = _manager;
         percent = _percent;
@@ -123,10 +123,10 @@ contract VotePool is Params {
     }
 
     //base on 1000
-    function submitPercentChange(uint16 _percent)
+    function submitPercentChange(uint _percent)
     external
     onlyManager
-    onlyValidPercent(_percent) {
+    onlyValidPercent(validatorType, _percent) {
         pendingPercentChange.newPercent = _percent;
         pendingPercentChange.submitBlk = block.number;
 
@@ -136,7 +136,7 @@ contract VotePool is Params {
     function confirmPercentChange()
     external
     onlyManager
-    onlyValidPercent(pendingPercentChange.newPercent) {
+    onlyValidPercent(validatorType, pendingPercentChange.newPercent) {
         require(pendingPercentChange.submitBlk > 0 && block.number - pendingPercentChange.submitBlk > PercentChangeLockPeriod, "Interval not long enough");
 
         percent = pendingPercentChange.newPercent;

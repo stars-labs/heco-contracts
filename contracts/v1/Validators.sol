@@ -71,7 +71,7 @@ contract Validators is Params {
         for (uint8 i = 0; i < _validators.length; i++) {
             address _validator = _validators[i];
             require(votePools[_validator] == IVotePool(0), "Validators already exists");
-            VotePool _pool = new VotePool(_validator, _managers[i], 100, ValidatorType.Poa, State.Ready);
+            VotePool _pool = new VotePool(_validator, _managers[i], 1000, ValidatorType.Poa, State.Ready);
             allValidators.push(_validator);
             votePools[_validator] = IVotePool(address(_pool));
 
@@ -105,7 +105,7 @@ contract Validators is Params {
         emit UpdateParams(_posCount, _posBackup, _poaCount, _poaBackup);
     }
 
-    function addValidator(address _validator, address _manager, uint8 _percent, ValidatorType _type)
+    function addValidator(address _validator, address _manager, uint _percent, ValidatorType _type)
     external
     onlyAdmin
     returns (address) {
