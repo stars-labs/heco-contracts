@@ -146,7 +146,7 @@ contract VotePool is Params {
     payable
     onlyManager {
         require(state == State.Idle || (state == State.Jail && block.number - punishBlk > JailPeriod), "Incorrect state");
-        require(exitBlk == 0 || block.number - exitBlk > LockPeriod, "Interval not long enough");
+        require(exitBlk == 0 || block.number - exitBlk > MarginLockPeriod, "Interval not long enough");
         require(msg.value > 0, "Value should not be zero");
 
         margin += msg.value;
@@ -189,7 +189,6 @@ contract VotePool is Params {
     function punish()
     external
     onlyPunishContract {
-        //        require(margin >= PunishAmount, "No enough margin left");
         punishBlk = block.number;
 
         state = State.Jail;
@@ -223,7 +222,7 @@ contract VotePool is Params {
     external
     onlyManager {
         require(state == State.Idle, "Incorrect state");
-        require(block.number - exitBlk > LockPeriod, "Interval not long enough");
+        require(block.number - exitBlk > MarginLockPeriod, "Interval not long enough");
         require(margin > 0, "No more margin");
 
         uint _amount = margin;
