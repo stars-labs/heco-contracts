@@ -23,7 +23,8 @@ contract Params {
 
     uint public constant JailPeriod = 0;
     uint public constant MarginLockPeriod = 0;
-    uint64 public constant LockPeriod = 0;
+    uint public constant WithdrawLockPeriod = 0;
+    uint public constant PercentChangeLockPeriod = 0;
 
     modifier onlyMiner() {
         require(msg.sender == block.coinbase, "Miner only");

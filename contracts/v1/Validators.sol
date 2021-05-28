@@ -25,7 +25,7 @@ contract Validators is Params {
 
     mapping(address => uint8) actives;
 
-    address[] public validators;
+    address[] public allValidators;
     mapping(address => IVotePool) public votePools;
 
     mapping(IVotePool => uint) public pendingReward;
@@ -72,6 +72,7 @@ contract Validators is Params {
             address _validator = _validators[i];
             require(votePools[_validator] == IVotePool(0), "Validators already exists");
             VotePool _pool = new VotePool(_validator, _managers[i], 100, ValidatorType.Poa, State.Ready);
+            allValidators.push(_validator);
             votePools[_validator] = IVotePool(address(_pool));
 
             // #if !Mainnet
@@ -112,7 +113,7 @@ contract Validators is Params {
 
         VotePool _pool = new VotePool(_validator, _manager, _percent, _type, State.Idle);
 
-        validators.push(_validator);
+        allValidators.push(_validator);
         votePools[_validator] = IVotePool(address(_pool));
 
         emit AddValidator(_validator, address(_pool));
@@ -215,6 +216,13 @@ contract Validators is Params {
     view
     returns (address[] memory){
         return backupValidators;
+    }
+
+    function getAllValidatorsLength()
+    external
+    view
+    returns (uint){
+        return allValidators.length;
     }
 
     function distributeBlockReward()

@@ -49,7 +49,8 @@ contract VotePool is Params {
     struct VoterInfo {
         uint amount;
         uint rewardDebt;
-        uint lastVoteBlk;
+        uint withdrawPendingAmount;
+        uint withdrawAnnounceBlock;
     }
 
     struct PercentChange {
@@ -69,7 +70,11 @@ contract VotePool is Params {
 
     modifier onlyValidPercent(uint16 _percent) {
         //zero represents null value, trade as invalid
-        require(_percent > 0 && _percent <= PERCENT_BASE, "Invalid percent");
+        if (validatorType == ValidatorType.Poa) {
+            require(_percent > 0 && _percent <= PERCENT_BASE, "Invalid percent");
+        } else {
+            require(_percent > 0 && _percent <= PERCENT_BASE.mul(3).div(10), "Invalid percent");
+        }
         _;
     }
 
@@ -132,7 +137,7 @@ contract VotePool is Params {
     external
     onlyManager
     onlyValidPercent(pendingPercentChange.newPercent) {
-        require(pendingPercentChange.submitBlk > 0 && block.number - pendingPercentChange.submitBlk > LockPeriod, "Interval not long enough");
+        require(pendingPercentChange.submitBlk > 0 && block.number - pendingPercentChange.submitBlk > PercentChangeLockPeriod, "Interval not long enough");
 
         percent = pendingPercentChange.newPercent;
         pendingPercentChange.newPercent = 0;
@@ -271,7 +276,6 @@ contract VotePool is Params {
 
         if (msg.value > 0) {
             voters[msg.sender].amount = voters[msg.sender].amount.add(msg.value);
-            voters[msg.sender].lastVoteBlk = block.number;
             voters[msg.sender].rewardDebt = voters[msg.sender].amount.mul(accRewardPerShare).div(COEFFICIENT);
             totalVote = totalVote.add(msg.value);
             emit Deposit(msg.sender, msg.value);
@@ -289,18 +293,33 @@ contract VotePool is Params {
         }
     }
 
+    function announceWithdraw(uint _amount)
+    external {
+        require(_amount > 0, "Value should not be zero");
+        require(_amount <= voters[msg.sender].amount, "Insufficient amount");
+
+        voters[msg.sender].withdrawPendingAmount = _amount;
+        voters[msg.sender].withdrawAnnounceBlock = block.number;
+    }
+
     function withdraw()
     external {
-        require(block.number - voters[msg.sender].lastVoteBlk > LockPeriod, "Interval too small");
+        require(block.number - voters[msg.sender].withdrawAnnounceBlock > WithdrawLockPeriod, "Interval too small");
+        require(voters[msg.sender].withdrawPendingAmount > 0, "Value should not be zero");
+        require(voters[msg.sender].amount >= voters[msg.sender].withdrawPendingAmount, "Insufficient amount");
+
         validatorsContract.withdrawReward();
 
         uint _pendingReward = accRewardPerShare.mul(voters[msg.sender].amount).div(COEFFICIENT).sub(voters[msg.sender].rewardDebt);
 
-        totalVote = totalVote.sub(voters[msg.sender].amount);
-        uint _amount = voters[msg.sender].amount;
+        uint _amount = voters[msg.sender].withdrawPendingAmount;
 
-        voters[msg.sender].amount = 0;
-        voters[msg.sender].rewardDebt = 0;
+        totalVote = totalVote.sub(_amount);
+
+        voters[msg.sender].amount = voters[msg.sender].amount.sub(_amount);
+        voters[msg.sender].rewardDebt = voters[msg.sender].amount.mul(accRewardPerShare).div(COEFFICIENT);
+        voters[msg.sender].withdrawPendingAmount = 0;
+        voters[msg.sender].withdrawAnnounceBlock = 0;
 
         if (state == State.Ready) {
             validatorsContract.lowerRanking();
