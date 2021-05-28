@@ -7,33 +7,33 @@ import "../Params.sol";
 import "./MockParams.sol";
 // #endif
 import "../../library/SafeMath.sol";
-import "../interfaces/ICandidatePool.sol";
-import "../interfaces/IValidator.sol";
+import "../interfaces/IVotePool.sol";
+import "../interfaces/IValidators.sol";
 
-contract MockCandidatePool is Params {
+contract MockVotePool is Params {
     using SafeMath for uint;
 
-    IValidator pool;
+    IValidators pool;
 
-    CandidateType public candidateType;
+    ValidatorType public validatorType;
 
     State public state;
 
     uint public percent;
 
-    address public candidate;
+    address public validator;
 
     address public manager;
 
     uint public totalVote;
 
-    constructor(address _miner, address _manager, uint8 _percent, CandidateType _type)
+    constructor(address _miner, address _manager, uint8 _percent, ValidatorType _type)
     public {
-        pool = IValidator(msg.sender);
-        candidate = _miner;
+        pool = IValidators(msg.sender);
+        validator = _miner;
         manager = _manager;
         percent = _percent;
-        candidateType = _type;
+        validatorType = _type;
         state = State.Ready;
     }
 
@@ -56,7 +56,7 @@ contract MockCandidatePool is Params {
         totalVote = _vote;
     }
 
-    function changeVoteAndRanking(IValidator _pool, uint _vote) external {
+    function changeVoteAndRanking(IValidators _pool, uint _vote) external {
         totalVote = _vote;
 
         if (_vote > totalVote) {

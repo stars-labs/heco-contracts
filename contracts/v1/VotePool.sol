@@ -7,21 +7,21 @@ import "./Params.sol";
 import "./mock/MockParams.sol";
 // #endif
 import "../library/SafeMath.sol";
-import "./interfaces/ICandidatePool.sol";
-import "./interfaces/IValidator.sol";
+import "./interfaces/IVotePool.sol";
+import "./interfaces/IValidators.sol";
 import "./interfaces/IPunish.sol";
 
-contract CandidatePool is Params {
+contract VotePool is Params {
     using SafeMath for uint;
 
     uint constant PERCENT_BASE = 1000;
     uint constant COEFFICIENT = 1e18;
 
-    CandidateType public candidateType;
+    ValidatorType public validatorType;
 
     State public state;
 
-    address public candidate;
+    address public validator;
 
     address public manager;
 
@@ -57,8 +57,8 @@ contract CandidatePool is Params {
         uint submitBlk;
     }
 
-    modifier onlyCandidate() {
-        require(msg.sender == candidate, "Only candidate allowed");
+    modifier onlyValidator() {
+        require(msg.sender == validator, "Only validator allowed");
         _;
     }
 
@@ -78,25 +78,25 @@ contract CandidatePool is Params {
     event ConfirmPercentChange(uint16 indexed percent);
     event AddMargin(address indexed sender, uint amount);
     event ChangeState(State indexed state);
-    event Exit(address indexed candidate);
+    event Exit(address indexed validator);
     event WithdrawMargin(address indexed sender, uint amount);
     event WithdrawPoolReward(address indexed sender, uint amount);
     event WithdrawVoteReward(address indexed sender, uint amount);
     event Deposit(address indexed sender, uint amount);
     event Withdraw(address indexed sender, uint amount);
-    event Punish(address indexed candidate, uint amount);
+    event Punish(address indexed validator, uint amount);
 
 
-    constructor(address _miner, address _manager, uint8 _percent, CandidateType _type, State _state)
+    constructor(address _validator, address _manager, uint8 _percent, ValidatorType _type, State _state)
     public
         // #if Mainnet
     onlyValidatorsContract
         // #endif
     onlyValidPercent(_percent) {
-        candidate = _miner;
+        validator = _validator;
         manager = _manager;
         percent = _percent;
-        candidateType = _type;
+        validatorType = _type;
         state = _state;
     }
 
@@ -106,13 +106,13 @@ contract CandidatePool is Params {
     onlyValidatorsContract
     onlyNotInitialized {
         initialized = true;
-        validatorContract.improveRanking();
+        validatorsContract.improveRanking();
     }
 
 
     function changeManager(address _manager)
     external
-    onlyCandidate {
+    onlyValidator {
         manager = _manager;
         emit ChangeManager(_manager);
     }
@@ -154,7 +154,7 @@ contract CandidatePool is Params {
         emit AddMargin(msg.sender, msg.value);
 
         uint minMargin;
-        if (candidateType == CandidateType.Poa) {
+        if (validatorType == ValidatorType.Poa) {
             minMargin = PoaMinMargin;
         } else {
             minMargin = PosMinMargin;
@@ -162,7 +162,7 @@ contract CandidatePool is Params {
 
         if (margin >= minMargin) {
             state = State.Ready;
-            punishContract.cleanPunishRecord(candidate);
+            punishContract.cleanPunishRecord(validator);
             emit ChangeState(state);
         }
     }
@@ -175,7 +175,7 @@ contract CandidatePool is Params {
 
             state = State.Pause;
             emit ChangeState(state);
-            validatorContract.removeRanking();
+            validatorsContract.removeRanking();
             return;
         } else {
             require(state == State.Pause, "Incorrect state");
@@ -194,13 +194,13 @@ contract CandidatePool is Params {
 
         state = State.Jail;
         emit ChangeState(state);
-        validatorContract.removeRanking();
+        validatorsContract.removeRanking();
 
         uint _punishAmount = margin >= PunishAmount ? PunishAmount : margin;
         if (_punishAmount > 0) {
             margin -= _punishAmount;
             address(0).transfer(_punishAmount);
-            emit Punish(candidate, _punishAmount);
+            emit Punish(validator, _punishAmount);
         }
 
         return;
@@ -215,8 +215,8 @@ contract CandidatePool is Params {
         state = State.Idle;
         emit ChangeState(state);
 
-        validatorContract.removeRanking();
-        emit Exit(candidate);
+        validatorsContract.removeRanking();
+        emit Exit(validator);
     }
 
     function withdrawMargin()
@@ -250,7 +250,7 @@ contract CandidatePool is Params {
     external
     payable
     onlyManager {
-        validatorContract.withdrawReward();
+        validatorsContract.withdrawReward();
         require(poolReward > 0, "No more reward");
 
         uint _amount = poolReward;
@@ -266,7 +266,7 @@ contract CandidatePool is Params {
     function deposit()
     external
     payable {
-        validatorContract.withdrawReward();
+        validatorsContract.withdrawReward();
 
         uint _pendingReward = accRewardPerShare.mul(voters[msg.sender].amount).div(COEFFICIENT).sub(voters[msg.sender].rewardDebt);
 
@@ -278,7 +278,7 @@ contract CandidatePool is Params {
             emit Deposit(msg.sender, msg.value);
 
             if (state == State.Ready) {
-                validatorContract.improveRanking();
+                validatorsContract.improveRanking();
             }
         } else {
             voters[msg.sender].rewardDebt = voters[msg.sender].amount.mul(accRewardPerShare).div(COEFFICIENT);
@@ -293,7 +293,7 @@ contract CandidatePool is Params {
     function withdraw()
     external {
         require(block.number - voters[msg.sender].lastVoteBlk > LockPeriod, "Interval too small");
-        validatorContract.withdrawReward();
+        validatorsContract.withdrawReward();
 
         uint _pendingReward = accRewardPerShare.mul(voters[msg.sender].amount).div(COEFFICIENT).sub(voters[msg.sender].rewardDebt);
 
@@ -304,7 +304,7 @@ contract CandidatePool is Params {
         voters[msg.sender].rewardDebt = 0;
 
         if (state == State.Ready) {
-            validatorContract.lowerRanking();
+            validatorsContract.lowerRanking();
         }
 
         if (_amount > 0) {

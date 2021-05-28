@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.0 <0.8.0;
 
-import "./interfaces/IValidator.sol";
+import "./interfaces/IValidators.sol";
 import "./interfaces/IPunish.sol";
 
 contract Params {
     bool public initialized;
 
     // System contracts
-    IValidator public constant validatorContract = IValidator(0x000000000000000000000000000000000000F005);
+    IValidators public constant validatorsContract = IValidators(0x000000000000000000000000000000000000F005);
     IPunish public constant punishContract = IPunish(0x000000000000000000000000000000000000F006);
 
     // System params
@@ -20,6 +20,7 @@ contract Params {
     uint public constant PunishAmount = 100 ether;
 
     uint public constant JailPeriod = 86400;
+    uint public constant MarginLockPeriod = 403200;
     uint64 public constant LockPeriod = 86400;
 
     modifier onlyMiner() {
@@ -48,7 +49,7 @@ contract Params {
     }
 
     modifier onlyValidatorsContract() {
-        require(msg.sender == address(validatorContract), "Validators contract only");
+        require(msg.sender == address(validatorsContract), "Validators contract only");
         _;
     }
 }

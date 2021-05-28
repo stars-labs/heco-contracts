@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.0 <0.8.0;
-import "../interfaces/IValidator.sol";
+import "../interfaces/IValidators.sol";
 import "../interfaces/IPunish.sol";
 
 
@@ -8,8 +8,8 @@ contract Params {
     bool public initialized;
 
     // System contracts
-    IValidator
-        public validatorContract;
+    IValidators
+        public validatorsContract;
     IPunish
         public punishContract;
 
@@ -22,6 +22,7 @@ contract Params {
     uint public constant PunishAmount = 1 ether;
 
     uint public constant JailPeriod = 0;
+    uint public constant MarginLockPeriod = 0;
     uint64 public constant LockPeriod = 0;
 
     modifier onlyMiner() {
@@ -56,7 +57,7 @@ contract Params {
 
     function setAddress(address _val, address _punish)
     external {
-        validatorContract = IValidator(_val);
+        validatorsContract = IValidators(_val);
         punishContract = IPunish(_punish);
     }
 }

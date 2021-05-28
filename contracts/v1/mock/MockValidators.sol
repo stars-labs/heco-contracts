@@ -8,23 +8,23 @@ import "./MockParams.sol";
 // #endif
 import "../../library/SafeMath.sol";
 import "../library/SortedList.sol";
-import "../interfaces/ICandidatePool.sol";
-import "../CandidatePool.sol";
+import "../interfaces/IVotePool.sol";
+import "../VotePool.sol";
 
-contract MockValidator is Params {
+contract MockValidators is Params {
     using SafeMath for uint;
     using SortedLinkedList for SortedLinkedList.List;
 
     address public admin;
 
-    mapping(CandidateType => uint8) public count;
-    mapping(CandidateType => uint8) public backupCount;
+    mapping(ValidatorType => uint8) public count;
+    mapping(ValidatorType => uint8) public backupCount;
 
     address[] public activeValidators;
     address[] public backupValidators;
 
-    // candidate address => contract address
-    mapping(address => ICandidatePool) public candidatePools;
+    // validator address => contract address
+    mapping(address => IVotePool) public votePools;
 
     mapping(address => uint) public pendingReward;
 
@@ -32,21 +32,21 @@ contract MockValidator is Params {
     external {
         admin = _admin;
 
-        count[CandidateType.Pos] = 11;
-        count[CandidateType.Poa] = 10;
-        backupCount[CandidateType.Pos] = 11;
-        backupCount[CandidateType.Poa] = 3;
+        count[ValidatorType.Pos] = 11;
+        count[ValidatorType.Poa] = 10;
+        backupCount[ValidatorType.Pos] = 11;
+        backupCount[ValidatorType.Poa] = 3;
     }
 
-    function addCandidate(address _candidate, address _manager, uint8 _percent, CandidateType _type)
+    function addValidator(address _validator, address _manager, uint8 _percent, ValidatorType _type)
     external
     returns (address) {
-        require(candidatePools[_candidate] == ICandidatePool(0), "Candidate already exists");
+        require(votePools[_validator] == IVotePool(0), "Validators already exists");
 
-        CandidatePool _candidateContract = new CandidatePool(_candidate, _manager, _percent, _type, State.Idle);
-        candidatePools[_candidate] = ICandidatePool(address(_candidateContract));
+        VotePool _validatorsContract = new VotePool(_validator, _manager, _percent, _type, State.Idle);
+        votePools[_validator] = IVotePool(address(_validatorsContract));
 
-        return address(_candidateContract);
+        return address(_validatorsContract);
     }
 
     function distributeBlockReward()
@@ -55,12 +55,12 @@ contract MockValidator is Params {
     {
         uint _total = 0;
         for (uint8 i = 0; i < activeValidators.length; i++) {
-            _total += candidatePools[activeValidators[i]].totalVote();
+            _total += votePools[activeValidators[i]].totalVote();
         }
 
         if (_total > 0) {
             for (uint8 i = 0; i < activeValidators.length; i++) {
-                ICandidatePool c = candidatePools[activeValidators[i]];
+                IVotePool c = votePools[activeValidators[i]];
                 pendingReward[address(c)] += c.totalVote().mul(msg.value).div(_total);
             }
         }
@@ -74,7 +74,7 @@ contract MockValidator is Params {
         }
 
         pendingReward[msg.sender] = 0;
-        CandidatePool(msg.sender).receiveReward{value : _amount}();
+        VotePool(msg.sender).receiveReward{value : _amount}();
     }
 
     function updateActiveValidatorSet(address[] memory newSet) external {

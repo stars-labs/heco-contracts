@@ -5,8 +5,8 @@ import "./Params.sol";
 // #else
 import "./mock/MockParams.sol";
 // #endif
-import "./interfaces/ICandidatePool.sol";
-import "./interfaces/IValidator.sol";
+import "./interfaces/IVotePool.sol";
+import "./interfaces/IValidators.sol";
 
 contract Punish is Params {
     uint256 public punishThreshold;
@@ -61,12 +61,12 @@ contract Punish is Params {
         punishRecords[_val].missedBlocksCounter++;
 
         if (punishRecords[_val].missedBlocksCounter % removeThreshold == 0) {
-            ICandidatePool _pool = validatorContract.candidatePools(_val);
+            IVotePool _pool = validatorsContract.votePools(_val);
             _pool.punish();
             // reset validator's missed blocks counter
             punishRecords[_val].missedBlocksCounter = 0;
         } else if (punishRecords[_val].missedBlocksCounter % punishThreshold == 0) {
-            validatorContract.removeValidatorIncoming(_val);
+            validatorsContract.removeValidatorIncoming(_val);
         }
 
         emit LogPunishValidator(_val, block.timestamp);
@@ -105,7 +105,7 @@ contract Punish is Params {
     onlyInitialized
     returns (bool)
     {
-        require(address(validatorContract.candidatePools(_val)) == msg.sender, "Candidate not registered");
+        require(address(validatorsContract.votePools(_val)) == msg.sender, "Validators not registered");
         if (punishRecords[_val].missedBlocksCounter != 0) {
             punishRecords[_val].missedBlocksCounter = 0;
         }

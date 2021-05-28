@@ -5,8 +5,8 @@ import "../Params.sol";
 // #else
 import "./MockParams.sol";
 // #endif
-import "../interfaces/ICandidatePool.sol";
-import "../interfaces/IValidator.sol";
+import "../interfaces/IVotePool.sol";
+import "../interfaces/IValidators.sol";
 
 contract MockPunish is Params {
     // clean validator's punish record if one restake in
