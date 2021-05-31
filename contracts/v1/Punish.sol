@@ -105,7 +105,7 @@ contract Punish is Params {
     onlyInitialized
     returns (bool)
     {
-        require(address(validatorsContract.votePools(_val)) == msg.sender, "Validators not registered");
+        require(address(validatorsContract.votePools(_val)) == msg.sender, "Validator not registered");
         if (punishRecords[_val].missedBlocksCounter != 0) {
             punishRecords[_val].missedBlocksCounter = 0;
         }

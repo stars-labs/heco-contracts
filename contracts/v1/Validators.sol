@@ -22,7 +22,6 @@ contract Validators is Params {
 
     address[] activeValidators;
     address[] backupValidators;
-
     mapping(address => uint8) actives;
 
     address[] public allValidators;
@@ -194,7 +193,7 @@ contract Validators is Params {
             uint8 _size = backupCount[types[i]];
             SortedLinkedList.List storage _topList = topVotePools[types[i]];
             IVotePool cur = _topList.head;
-            while (_size >= 0 && cur != IVotePool(0)) {
+            while (_size > 0 && cur != IVotePool(0)) {
                 if (actives[cur.validator()] == 0) {
                     backupValidators.push(cur.validator());
                     _size--;
