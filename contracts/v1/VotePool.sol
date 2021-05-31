@@ -70,7 +70,7 @@ contract VotePool is Params {
 
     modifier onlyValidPercent(ValidatorType _type, uint _percent) {
         //zero represents null value, trade as invalid
-        if ( _type == ValidatorType.Poa) {
+        if (_type == ValidatorType.Poa) {
             require(_percent > 0 && _percent <= PERCENT_BASE, "Invalid percent");
         } else {
             require(_percent > 0 && _percent <= PERCENT_BASE.mul(3).div(10), "Invalid percent");
@@ -137,7 +137,7 @@ contract VotePool is Params {
     external
     onlyManager
     onlyValidPercent(validatorType, pendingPercentChange.newPercent) {
-        require(pendingPercentChange.submitBlk > 0 && block.number - pendingPercentChange.submitBlk > PercentChangeLockPeriod, "Interval not long enough");
+        require(pendingPercentChange.submitBlk > 0 && block.number.sub(pendingPercentChange.submitBlk) > PercentChangeLockPeriod, "Interval not long enough");
 
         percent = pendingPercentChange.newPercent;
         pendingPercentChange.newPercent = 0;
@@ -150,11 +150,11 @@ contract VotePool is Params {
     external
     payable
     onlyManager {
-        require(state == State.Idle || (state == State.Jail && block.number - punishBlk > JailPeriod), "Incorrect state");
-        require(exitBlk == 0 || block.number - exitBlk > MarginLockPeriod, "Interval not long enough");
+        require(state == State.Idle || (state == State.Jail && block.number.sub(punishBlk) > JailPeriod), "Incorrect state");
+        require(exitBlk == 0 || block.number.sub(exitBlk) > MarginLockPeriod, "Interval not long enough");
         require(msg.value > 0, "Value should not be zero");
 
-        margin += msg.value;
+        margin = margin.add(msg.value);
 
         emit AddMargin(msg.sender, msg.value);
 
@@ -202,7 +202,7 @@ contract VotePool is Params {
 
         uint _punishAmount = margin >= PunishAmount ? PunishAmount : margin;
         if (_punishAmount > 0) {
-            margin -= _punishAmount;
+            margin = margin.sub(_punishAmount);
             address(0).transfer(_punishAmount);
             emit Punish(validator, _punishAmount);
         }
@@ -227,7 +227,7 @@ contract VotePool is Params {
     external
     onlyManager {
         require(state == State.Idle, "Incorrect state");
-        require(block.number - exitBlk > MarginLockPeriod, "Interval not long enough");
+        require(block.number.sub(exitBlk) > MarginLockPeriod, "Interval not long enough");
         require(margin > 0, "No more margin");
 
         uint _amount = margin;
@@ -241,7 +241,8 @@ contract VotePool is Params {
     payable
     onlyValidatorsContract {
         uint _rewardForPool = msg.value.mul(percent).div(PERCENT_BASE);
-        poolReward += _rewardForPool;
+        poolReward = poolReward.add(_rewardForPool);
+
         if (totalVote > 0) {
             accRewardPerShare = msg.value.sub(_rewardForPool).mul(COEFFICIENT).div(totalVote).add(accRewardPerShare);
         }
@@ -304,7 +305,7 @@ contract VotePool is Params {
 
     function withdraw()
     external {
-        require(block.number - voters[msg.sender].withdrawAnnounceBlock > WithdrawLockPeriod, "Interval too small");
+        require(block.number.sub(voters[msg.sender].withdrawAnnounceBlock) > WithdrawLockPeriod, "Interval too small");
         require(voters[msg.sender].withdrawPendingAmount > 0, "Value should not be zero");
         require(voters[msg.sender].amount >= voters[msg.sender].withdrawPendingAmount, "Insufficient amount");
 
