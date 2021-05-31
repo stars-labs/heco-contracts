@@ -65,7 +65,6 @@ library SortedLinkedList {
             _list.prev[_list.head] = _value;
             _list.prev[_value] = IVotePool(0);
             _list.head = _value;
-            return;
         } else {
             _list.next[_value] = _list.next[_prev];
             _list.prev[_list.next[_prev]] = _value;
