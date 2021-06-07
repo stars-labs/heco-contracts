@@ -14,7 +14,6 @@ import "./interfaces/IPunish.sol";
 contract VotePool is Params {
     using SafeMath for uint;
 
-    uint constant PERCENT_BASE = 1000;
     uint constant COEFFICIENT = 1e18;
 
     ValidatorType public validatorType;
@@ -27,7 +26,7 @@ contract VotePool is Params {
 
     uint public margin;
 
-    //base on 1000
+    //base on 10000
     uint public percent;
 
     PercentChange public pendingPercentChange;
@@ -326,10 +325,8 @@ contract VotePool is Params {
             validatorsContract.lowerRanking();
         }
 
-        if (_amount > 0) {
-            msg.sender.transfer(_amount.add(_pendingReward));
-            emit Withdraw(msg.sender, _amount);
-            emit WithdrawVoteReward(msg.sender, _pendingReward);
-        }
+        msg.sender.transfer(_amount.add(_pendingReward));
+        emit Withdraw(msg.sender, _amount);
+        emit WithdrawVoteReward(msg.sender, _pendingReward);
     }
 }
