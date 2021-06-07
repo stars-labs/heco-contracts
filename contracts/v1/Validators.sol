@@ -27,6 +27,7 @@ contract Validators is Params {
     address[] public allValidators;
     mapping(address => IVotePool) public votePools;
 
+    uint256 rewardLeft;
     mapping(IVotePool => uint) public pendingReward;
 
     mapping(ValidatorType => SortedLinkedList.List) public topVotePools;
@@ -70,7 +71,7 @@ contract Validators is Params {
         for (uint8 i = 0; i < _validators.length; i++) {
             address _validator = _validators[i];
             require(votePools[_validator] == IVotePool(0), "Validators already exists");
-            VotePool _pool = new VotePool(_validator, _managers[i], 1000, ValidatorType.Poa, State.Ready);
+            VotePool _pool = new VotePool(_validator, _managers[i], PERCENT_BASE, ValidatorType.Poa, State.Ready);
             allValidators.push(_validator);
             votePools[_validator] = IVotePool(address(_pool));
 
@@ -188,17 +189,17 @@ contract Validators is Params {
 
         delete backupValidators;
 
-        ValidatorType[2] memory types = [ValidatorType.Pos, ValidatorType.Poa];
-        for (uint8 i = 0; i < types.length; i++) {
-            uint8 _size = backupCount[types[i]];
-            SortedLinkedList.List storage _topList = topVotePools[types[i]];
-            IVotePool cur = _topList.head;
-            while (_size > 0 && cur != IVotePool(0)) {
-                if (actives[cur.validator()] == 0) {
-                    backupValidators.push(cur.validator());
+        ValidatorType[2] memory _types = [ValidatorType.Pos, ValidatorType.Poa];
+        for (uint8 i = 0; i < _types.length; i++) {
+            uint8 _size = backupCount[_types[i]];
+            SortedLinkedList.List storage _topList = topVotePools[_types[i]];
+            IVotePool _cur = _topList.head;
+            while (_size > 0 && _cur != IVotePool(0)) {
+                if (actives[_cur.validator()] == 0) {
+                    backupValidators.push(_cur.validator());
                     _size--;
                 }
-                cur = _topList.next[cur];
+                _cur = _topList.next[_cur];
             }
         }
     }
@@ -235,15 +236,27 @@ contract Validators is Params {
     {
         operationsDone[block.number][Operation.Distribute] = true;
 
-        uint _left = msg.value;
+        uint _left = msg.value + rewardLeft;
+
         // 10% to backups 40% validators share by vote 50% validators share
+        uint _firstPart = _left.mul(10).div(100);
+        uint _secondPartTotal = _left.mul(40).div(100);
+        uint _thirdPart = _left.mul(50).div(100);
+
         if (backupValidators.length > 0) {
-            uint _firstPart = msg.value.mul(10).div(100).div(backupValidators.length);
+            uint _totalBackupVote = 0;
             for (uint8 i = 0; i < backupValidators.length; i++) {
-                IVotePool _pool = votePools[backupValidators[i]];
-                pendingReward[_pool] = pendingReward[_pool].add(_firstPart);
+                _totalBackupVote = _totalBackupVote.add(votePools[backupValidators[i]].totalVote());
             }
-            _left = _left.sub(_firstPart.mul(backupValidators.length));
+
+            if (_totalBackupVote > 0) {
+                for (uint8 i = 0; i < backupValidators.length; i++) {
+                    IVotePool _pool = votePools[backupValidators[i]];
+                    uint256 _reward = _firstPart.mul(_pool.totalVote()).div(_totalBackupVote);
+                    pendingReward[_pool] = pendingReward[_pool].add(_reward);
+                    _left = _left.sub(_reward);
+                }
+            }
         }
 
         if (activeValidators.length > 0) {
@@ -252,19 +265,20 @@ contract Validators is Params {
                 _totalVote = _totalVote.add(votePools[activeValidators[i]].totalVote());
             }
 
-            uint _secondPartTotal = _totalVote > 0 ? msg.value.mul(40).div(100) : 0;
-
-            uint _thirdPart = _left.sub(_secondPartTotal).div(activeValidators.length);
             for (uint8 i = 0; i < activeValidators.length; i++) {
                 IVotePool _pool = votePools[activeValidators[i]];
+                uint _reward = _thirdPart.div(activeValidators.length);
                 if (_totalVote > 0) {
                     uint _secondPart = _pool.totalVote().mul(_secondPartTotal).div(_totalVote);
-                    pendingReward[_pool] = pendingReward[_pool].add(_secondPart).add(_thirdPart);
-                } else {
-                    pendingReward[_pool] = pendingReward[_pool].add(_thirdPart);
+                    _reward = _reward.add(_secondPart);
                 }
+
+                pendingReward[_pool] = pendingReward[_pool].add(_reward);
+                _left = _left.sub(_reward);
             }
         }
+
+        rewardLeft = _left;
     }
 
     function withdrawReward()

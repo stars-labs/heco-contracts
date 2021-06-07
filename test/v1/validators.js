@@ -109,7 +109,7 @@ contract("Validators test", accounts => {
         let vals = await validators.getTopValidators()
         await validators.updateActiveValidatorSet(vals, 200)
         assert.equal((await validators.getActiveValidators()).length, 1, 'active validators length')
-        assert.equal((await validators.getBackupValidators()).length, 4, 'backup validators length')
+        assert.equal((await validators.getBackupValidators()).length, 1, 'backup validators length')
     })
 
     it('distributeBlockReward', async () => {
@@ -132,7 +132,7 @@ contract("Validators test", accounts => {
         let vals = await validators.getTopValidators()
         await validators.updateActiveValidatorSet(vals, 200)
         assert.equal((await validators.getActiveValidators()).length, 3, 'active validators length')
-        assert.equal((await validators.getBackupValidators()).length, 4, 'backup validators length')
+        assert.equal((await validators.getBackupValidators()).length, 1, 'backup validators length')
 
         await validators.distributeBlockReward({from: accounts[0], value: web3.utils.toWei("100", "ether")})
 

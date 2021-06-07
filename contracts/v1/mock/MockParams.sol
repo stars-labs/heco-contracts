@@ -21,6 +21,8 @@ contract Params {
 
     uint public constant PunishAmount = 1 ether;
 
+    uint constant PERCENT_BASE = 10000;
+
     uint public constant JailPeriod = 0;
     uint public constant MarginLockPeriod = 0;
     uint public constant WithdrawLockPeriod = 0;
