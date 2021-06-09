@@ -31,8 +31,8 @@ contract VotePool is Params {
 
     PercentChange public pendingPercentChange;
 
-    //reward for this pool not for voters
-    uint public poolReward;
+    //reward for validator not for voters
+    uint public validatorReward;
 
     mapping(address => VoterInfo) public voters;
 
@@ -84,7 +84,7 @@ contract VotePool is Params {
     event ChangeState(State indexed state);
     event Exit(address indexed validator);
     event WithdrawMargin(address indexed sender, uint amount);
-    event WithdrawPoolReward(address indexed sender, uint amount);
+    event WithdrawValidatorReward(address indexed sender, uint amount);
     event WithdrawVoteReward(address indexed sender, uint amount);
     event Deposit(address indexed sender, uint amount);
     event Withdraw(address indexed sender, uint amount);
@@ -239,28 +239,28 @@ contract VotePool is Params {
     external
     payable
     onlyValidatorsContract {
-        uint _rewardForPool = msg.value.mul(percent).div(PERCENT_BASE);
-        poolReward = poolReward.add(_rewardForPool);
+        uint _rewardForValidator = msg.value.mul(percent).div(PERCENT_BASE);
+        validatorReward = validatorReward.add(_rewardForValidator);
 
         if (totalVote > 0) {
-            accRewardPerShare = msg.value.sub(_rewardForPool).mul(COEFFICIENT).div(totalVote).add(accRewardPerShare);
+            accRewardPerShare = msg.value.sub(_rewardForValidator).mul(COEFFICIENT).div(totalVote).add(accRewardPerShare);
         }
 
         //TODO remove it or not ?
-        require(poolReward + accRewardPerShare.mul(totalVote).div(COEFFICIENT) <= address(this).balance, "Insufficient balance");
+        require(validatorReward + accRewardPerShare.mul(totalVote).div(COEFFICIENT) <= address(this).balance, "Insufficient balance");
     }
 
-    function withdrawPoolReward()
+    function withdrawValidatorReward()
     external
     payable
     onlyManager {
         validatorsContract.withdrawReward();
-        require(poolReward > 0, "No more reward");
+        require(validatorReward > 0, "No more reward");
 
-        uint _amount = poolReward;
-        poolReward = 0;
+        uint _amount = validatorReward;
+        validatorReward = 0;
         msg.sender.transfer(_amount);
-        emit WithdrawPoolReward(msg.sender, _amount);
+        emit WithdrawValidatorReward(msg.sender, _amount);
     }
 
     function getPendingReward(address _voter) external view returns (uint){
