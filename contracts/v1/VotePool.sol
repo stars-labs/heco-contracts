@@ -264,7 +264,15 @@ contract VotePool is Params {
     }
 
     function getPendingReward(address _voter) external view returns (uint){
-        return accRewardPerShare.mul(voters[_voter].amount).div(COEFFICIENT).sub(voters[_voter].rewardDebt);
+        uint _poolPendingReward = validatorsContract.pendingReward(IVotePool(address(this)));
+        uint _rewardForValidator = _poolPendingReward.mul(percent).div(PERCENT_BASE);
+
+        uint _share = accRewardPerShare;
+        if (totalVote > 0) {
+            _share = _poolPendingReward.sub(_rewardForValidator).mul(COEFFICIENT).div(totalVote).add(_share);
+        }
+
+        return _share.mul(voters[_voter].amount).div(COEFFICIENT).sub(voters[_voter].rewardDebt);
     }
 
     function deposit()
