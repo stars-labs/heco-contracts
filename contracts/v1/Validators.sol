@@ -321,9 +321,4 @@ contract Validators is Params {
         _list.removeRanking(_validator);
     }
 
-    function removeValidatorIncoming(address _validator)
-    external
-    onlyPunishContract {
-        pendingReward[votePools[_validator]] = 0;
-    }
 }

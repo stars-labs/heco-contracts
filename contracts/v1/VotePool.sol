@@ -49,7 +49,7 @@ contract VotePool is Params {
         uint amount;
         uint rewardDebt;
         uint withdrawPendingAmount;
-        uint withdrawAnnounceBlock;
+        uint withdrawExitBlock;
     }
 
     struct PercentChange {
@@ -84,11 +84,13 @@ contract VotePool is Params {
     event ChangeState(State indexed state);
     event Exit(address indexed validator);
     event WithdrawMargin(address indexed sender, uint amount);
+    event  ExitVote(address indexed sender, uint amount);
     event WithdrawValidatorReward(address indexed sender, uint amount);
     event WithdrawVoteReward(address indexed sender, uint amount);
     event Deposit(address indexed sender, uint amount);
     event Withdraw(address indexed sender, uint amount);
     event Punish(address indexed validator, uint amount);
+    event RemoveIncoming(address indexed validator, uint amount);
 
 
     constructor(address _validator, address _manager, uint _percent, ValidatorType _type, State _state)
@@ -195,8 +197,10 @@ contract VotePool is Params {
     onlyPunishContract {
         punishBlk = block.number;
 
-        state = State.Jail;
-        emit ChangeState(state);
+        if (state != State.Pause) {
+            state = State.Jail;
+            emit ChangeState(state);
+        }
         validatorsContract.removeRanking();
 
         uint _punishAmount = margin >= PunishAmount ? PunishAmount : margin;
@@ -207,6 +211,15 @@ contract VotePool is Params {
         }
 
         return;
+    }
+
+    function removeValidatorIncoming()
+    external
+    onlyPunishContract {
+        uint _incoming = validatorReward;
+        validatorReward = 0;
+        address(0).transfer(_incoming);
+        emit RemoveIncoming(validator, _incoming);
     }
 
     function exit()
@@ -225,7 +238,7 @@ contract VotePool is Params {
     function withdrawMargin()
     external
     onlyManager {
-        require(state == State.Idle, "Incorrect state");
+        require(state == State.Idle || (state == State.Jail && block.number.sub(punishBlk) > JailPeriod), "Incorrect state");
         require(block.number.sub(exitBlk) > MarginLockPeriod, "Interval not long enough");
         require(margin > 0, "No more margin");
 
@@ -301,40 +314,43 @@ contract VotePool is Params {
         }
     }
 
-    function announceWithdraw(uint _amount)
+    function exitVote(uint _amount)
     external {
         require(_amount > 0, "Value should not be zero");
         require(_amount <= voters[msg.sender].amount, "Insufficient amount");
-
-        voters[msg.sender].withdrawPendingAmount = _amount;
-        voters[msg.sender].withdrawAnnounceBlock = block.number;
-    }
-
-    function withdraw()
-    external {
-        require(block.number.sub(voters[msg.sender].withdrawAnnounceBlock) > WithdrawLockPeriod, "Interval too small");
-        require(voters[msg.sender].withdrawPendingAmount > 0, "Value should not be zero");
-        require(voters[msg.sender].amount >= voters[msg.sender].withdrawPendingAmount, "Insufficient amount");
 
         validatorsContract.withdrawReward();
 
         uint _pendingReward = accRewardPerShare.mul(voters[msg.sender].amount).div(COEFFICIENT).sub(voters[msg.sender].rewardDebt);
 
-        uint _amount = voters[msg.sender].withdrawPendingAmount;
-
         totalVote = totalVote.sub(_amount);
 
         voters[msg.sender].amount = voters[msg.sender].amount.sub(_amount);
         voters[msg.sender].rewardDebt = voters[msg.sender].amount.mul(accRewardPerShare).div(COEFFICIENT);
-        voters[msg.sender].withdrawPendingAmount = 0;
-        voters[msg.sender].withdrawAnnounceBlock = 0;
 
         if (state == State.Ready) {
             validatorsContract.lowerRanking();
         }
 
-        msg.sender.transfer(_amount.add(_pendingReward));
-        emit Withdraw(msg.sender, _amount);
+        voters[msg.sender].withdrawPendingAmount = voters[msg.sender].withdrawPendingAmount.add(_amount);
+        voters[msg.sender].withdrawExitBlock = block.number;
+
+        msg.sender.transfer(_pendingReward);
+
+        emit ExitVote(msg.sender, _amount);
         emit WithdrawVoteReward(msg.sender, _pendingReward);
+    }
+
+    function withdraw()
+    external {
+        require(block.number.sub(voters[msg.sender].withdrawExitBlock) > WithdrawLockPeriod, "Interval too small");
+        require(voters[msg.sender].withdrawPendingAmount > 0, "Value should not be zero");
+
+        uint _amount = voters[msg.sender].withdrawPendingAmount;
+        voters[msg.sender].withdrawPendingAmount = 0;
+        voters[msg.sender].withdrawExitBlock = 0;
+
+        msg.sender.transfer(_amount);
+        emit Withdraw(msg.sender, _amount);
     }
 }

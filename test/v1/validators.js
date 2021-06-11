@@ -78,7 +78,7 @@ contract("Validators test", accounts => {
     it("add validator", async () => {
         let tx = await validators.addValidator(accounts[0], accounts[0], 10, Pos, {
             from: accounts[0],
-            gas: 2000000
+            gas: 4000000
         })
 
         truffleAssert.eventEmitted(tx, 'AddValidator', {
@@ -113,9 +113,9 @@ contract("Validators test", accounts => {
     })
 
     it('distributeBlockReward', async () => {
-        await validators.addValidator(accounts[1], accounts[1], 10, Pos, {
+        let tx = await validators.addValidator(accounts[1], accounts[1], 10, Pos, {
             from: accounts[0],
-            gas: 2000000
+            gas: 4000000
         })
 
         let candidate0 = await VotePool.at(await validators.votePools(accounts[0]))
@@ -152,35 +152,4 @@ contract("Validators test", accounts => {
                 web3.utils.toWei(new BN(100), "ether").mul(new BN(4)).div(new BN(20))
             ).toString())
     })
-
-
-    // use to check gas used when 21 val + 21 backup
-    // it('distributeBlockReward2', async () => {
-    //     for (let i = 0; i < accounts.length; i++) {
-    //         if ((await validator.candidates(accounts[i])) !== '0x0000000000000000000000000000000000000000') {
-    //             continue
-    //         }
-    //         await validator.addValidator(accounts[i], accounts[i], 10, Pos, {
-    //             from: accounts[0],
-    //             gas: 2000000
-    //         })
-    //
-    //
-    //         let can = await VotePool.at(await validator.candidates(accounts[i]))
-    //         await can.setAddress(validator.address, punish.address)
-    //
-    //         let from = await can.validator()
-    //         await can.addMargin({from, value: web3.utils.toWei("10", 'ether')})
-    //         await can.deposit({from, value: web3.utils.toWei("10", 'ether')})
-    //     }
-    //
-    //     let vals = await validator.getTopValidators()
-    //     await validator.updateActiveValidatorSet(vals, 200)
-    //
-    //     assert.equal(await validator.getActiveValidatorsCount(), 21, 'active validators length')
-    //
-    //     let tx = await validator.distributeBlockReward({from: accounts[0], value: web3.utils.toWei("100", "ether")})
-    //     console.log(tx)
-    // })
-
 });
