@@ -66,7 +66,8 @@ contract Punish is Params {
             // reset validator's missed blocks counter
             punishRecords[_val].missedBlocksCounter = 0;
         } else if (punishRecords[_val].missedBlocksCounter % punishThreshold == 0) {
-            validatorsContract.removeValidatorIncoming(_val);
+            IVotePool _pool = validatorsContract.votePools(_val);
+            _pool.removeValidatorIncoming();
         }
 
         emit LogPunishValidator(_val, block.timestamp);

@@ -12,6 +12,8 @@ interface IVotePool {
     function switchState(bool pause) external;
 
     function punish() external;
+
+    function removeValidatorIncoming() external;
 }
 
     enum ValidatorType {

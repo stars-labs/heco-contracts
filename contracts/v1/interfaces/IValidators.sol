@@ -14,8 +14,6 @@ interface IValidators {
     function withdrawReward() external;
 
     function votePools(address validator) external view returns (IVotePool);
-
-    function removeValidatorIncoming(address validator) external;
 }
 
     enum Operation {Distribute, UpdateValidators}
