@@ -32,7 +32,7 @@ contract VotePool is Params {
     PercentChange public pendingPercentChange;
 
     //reward for validator not for voters
-    uint public validatorReward;
+    uint validatorReward;
 
     mapping(address => VoterInfo) public voters;
 
@@ -274,6 +274,13 @@ contract VotePool is Params {
         validatorReward = 0;
         msg.sender.transfer(_amount);
         emit WithdrawValidatorReward(msg.sender, _amount);
+    }
+
+    function getValidatorPendingReward() external view returns (uint) {
+        uint _poolPendingReward = validatorsContract.pendingReward(IVotePool(address(this)));
+        uint _rewardForValidator = _poolPendingReward.mul(percent).div(PERCENT_BASE);
+
+        return validatorReward.add(_rewardForValidator);
     }
 
     function getPendingReward(address _voter) external view returns (uint){
