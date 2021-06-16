@@ -99,6 +99,7 @@ contract AddressList {
     }
 
     function addBlacklist(address a, Direction d) external onlyAdmin {
+        require(a != admin, "cannot add admin to blacklist");
         if (d == Direction.Both) {
             blacksFrom.push(a);
             blacksTo.push(a);
