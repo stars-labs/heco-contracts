@@ -27,10 +27,10 @@ contract Validators is Params {
     address[] public allValidators;
     mapping(address => IVotePool) public votePools;
 
-    uint256 public rewardLeft;
+    uint256 rewardLeft;
     mapping(IVotePool => uint) public pendingReward;
 
-    mapping(ValidatorType => SortedLinkedList.List) public topVotePools;
+    mapping(ValidatorType => SortedLinkedList.List) topVotePools;
 
     mapping(uint256 => mapping(Operation => bool)) operationsDone;
 
