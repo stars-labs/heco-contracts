@@ -37,7 +37,7 @@ contract VotePool is Params {
     mapping(address => VoterInfo) public voters;
 
     //use to calc voter's reward
-    uint public accRewardPerShare;
+    uint accRewardPerShare;
 
     uint public totalVote;
 
