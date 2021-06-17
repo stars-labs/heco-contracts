@@ -27,14 +27,14 @@ contract Governance is Params {
     event AdminChanging(address indexed newAdmin);
     event AdminChanged(address indexed newAdmin);
 
-    event ProposalCommited(uint indexed id);
+    event ProposalCommitted(uint indexed id);
     event ProposalFinished(uint indexed id);
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Admin only");
         _;
     }
-    
+
     function initialize(address _admin) external onlyNotInitialized {
         admin = _admin;
         initialized = true;
@@ -62,14 +62,14 @@ contract Governance is Params {
         proposals.push(p);
         passedProposals.push(p);
 
-        emit ProposalCommited(id);
+        emit ProposalCommitted(id);
     }
 
-    function getProposalsTotalCount() view external returns(uint) {
+    function getProposalsTotalCount() view external returns (uint) {
         return proposals.length;
     }
 
-    function getProposalById(uint id) view external returns(
+    function getProposalById(uint id) view external returns (
         uint _id,
         uint action,
         address from,
@@ -82,11 +82,11 @@ contract Governance is Params {
         return (p.id, p.action, p.from, p.to, p.value, p.data);
     }
 
-    function getPassedProposalCount() view external returns(uint32) {
+    function getPassedProposalCount() view external returns (uint32) {
         return uint32(passedProposals.length);
     }
 
-    function getPassedProposalByIndex(uint32 index) view external returns(
+    function getPassedProposalByIndex(uint32 index) view external returns (
         uint id,
         uint action,
         address from,
