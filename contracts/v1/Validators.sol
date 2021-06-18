@@ -85,6 +85,7 @@ contract Validators is Params {
 
     function changeAdmin(address _newAdmin)
     external
+    onlyValidAddress(_newAdmin)
     onlyAdmin {
         admin = _newAdmin;
         emit ChangeAdmin(admin);
@@ -236,7 +237,7 @@ contract Validators is Params {
     {
         operationsDone[block.number][Operation.Distribute] = true;
 
-        uint _left = msg.value + rewardLeft;
+        uint _left = msg.value.add(rewardLeft);
 
         // 10% to backups 40% validators share by vote 50% validators share
         uint _firstPart = _left.mul(10).div(100);
