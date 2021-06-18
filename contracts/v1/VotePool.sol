@@ -98,6 +98,8 @@ contract VotePool is Params {
         // #if Mainnet
     onlyValidatorsContract
         // #endif
+    onlyValidAddress(_validator)
+    onlyValidAddress(_manager)
     onlyValidPercent(_type, _percent) {
         validator = _validator;
         manager = _manager;
@@ -258,9 +260,6 @@ contract VotePool is Params {
         if (totalVote > 0) {
             accRewardPerShare = msg.value.sub(_rewardForValidator).mul(COEFFICIENT).div(totalVote).add(accRewardPerShare);
         }
-
-        //TODO remove it or not ?
-        require(validatorReward + accRewardPerShare.mul(totalVote).div(COEFFICIENT) <= address(this).balance, "Insufficient balance");
     }
 
     function withdrawValidatorReward()

@@ -54,4 +54,9 @@ contract Params {
         require(msg.sender == address(validatorsContract), "Validators contract only");
         _;
     }
+
+    modifier onlyValidAddress(address _address) {
+        require(_address != address(0), "Invalid address");
+        _;
+    }
 }

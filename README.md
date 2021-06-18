@@ -8,14 +8,15 @@ Install dependency:
 yarn
 ```
 
-## unit test
-
 Compile files:
 
 ```bash
-NET=mainnet yarn compile
+yarn compile
 ```
 
+Release solidity files will be generated in `cache` folder.
+
+## unit test
 Test:
 
 ```bash
