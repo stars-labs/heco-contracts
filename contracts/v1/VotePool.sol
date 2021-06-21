@@ -7,14 +7,17 @@ import "./Params.sol";
 import "./mock/MockParams.sol";
 // #endif
 import "../library/SafeMath.sol";
+import "./library/SafeEthTransfer.sol";
+import "./library/ReentrancyGuard.sol";
 import "./interfaces/IVotePool.sol";
 import "./interfaces/IValidators.sol";
 import "./interfaces/IPunish.sol";
 
-contract VotePool is Params {
+contract VotePool is Params, ReentrancyGuard {
     using SafeMath for uint;
 
     uint constant COEFFICIENT = 1e18;
+    uint constant MAX_GAS_USED = 50000;
 
     ValidatorType public validatorType;
 
@@ -208,8 +211,10 @@ contract VotePool is Params {
         uint _punishAmount = margin >= PunishAmount ? PunishAmount : margin;
         if (_punishAmount > 0) {
             margin = margin.sub(_punishAmount);
-            address(0).transfer(_punishAmount);
-            emit Punish(validator, _punishAmount);
+            bool _success = SafeEthTransfer.transferReturnResult(address(0), _punishAmount, MAX_GAS_USED);
+            if (_success) {
+                emit Punish(validator, _punishAmount);
+            }
         }
 
         return;
@@ -220,8 +225,10 @@ contract VotePool is Params {
     onlyPunishContract {
         uint _incoming = validatorReward;
         validatorReward = 0;
-        address(0).transfer(_incoming);
-        emit RemoveIncoming(validator, _incoming);
+        bool _success = SafeEthTransfer.transferReturnResult(address(0), _incoming, MAX_GAS_USED);
+        if (_success) {
+            emit RemoveIncoming(validator, _incoming);
+        }
     }
 
     function exit()
@@ -241,6 +248,7 @@ contract VotePool is Params {
 
     function withdrawMargin()
     external
+    nonReentrant
     onlyManager {
         require(state == State.Idle || (state == State.Jail && block.number.sub(punishBlk) > JailPeriod), "Incorrect state");
         require(block.number.sub(exitBlk) > MarginLockPeriod, "Interval not long enough");
@@ -248,7 +256,7 @@ contract VotePool is Params {
 
         uint _amount = margin;
         margin = 0;
-        msg.sender.transfer(_amount);
+        SafeEthTransfer.transferRevertOnError(msg.sender, _amount, MAX_GAS_USED);
         emit WithdrawMargin(msg.sender, _amount);
     }
 
@@ -267,13 +275,14 @@ contract VotePool is Params {
     function withdrawValidatorReward()
     external
     payable
+    nonReentrant
     onlyManager {
         validatorsContract.withdrawReward();
         require(validatorReward > 0, "No more reward");
 
         uint _amount = validatorReward;
         validatorReward = 0;
-        msg.sender.transfer(_amount);
+        SafeEthTransfer.transferRevertOnError(msg.sender, _amount, MAX_GAS_USED);
         emit WithdrawValidatorReward(msg.sender, _amount);
     }
 
@@ -298,6 +307,7 @@ contract VotePool is Params {
 
     function deposit()
     external
+    nonReentrant
     payable {
         validatorsContract.withdrawReward();
 
@@ -317,12 +327,13 @@ contract VotePool is Params {
         }
 
         if (_pendingReward > 0) {
-            msg.sender.transfer(_pendingReward);
+            SafeEthTransfer.transferRevertOnError(msg.sender, _pendingReward, MAX_GAS_USED);
             emit WithdrawVoteReward(msg.sender, _pendingReward);
         }
     }
 
     function exitVote(uint _amount)
+    nonReentrant
     external {
         require(_amount > 0, "Value should not be zero");
         require(_amount <= voters[msg.sender].amount, "Insufficient amount");
@@ -343,13 +354,14 @@ contract VotePool is Params {
         voters[msg.sender].withdrawPendingAmount = voters[msg.sender].withdrawPendingAmount.add(_amount);
         voters[msg.sender].withdrawExitBlock = block.number;
 
-        msg.sender.transfer(_pendingReward);
+        SafeEthTransfer.transferRevertOnError(msg.sender, _pendingReward, MAX_GAS_USED);
 
         emit ExitVote(msg.sender, _amount);
         emit WithdrawVoteReward(msg.sender, _pendingReward);
     }
 
     function withdraw()
+    nonReentrant
     external {
         require(block.number.sub(voters[msg.sender].withdrawExitBlock) > WithdrawLockPeriod, "Interval too small");
         require(voters[msg.sender].withdrawPendingAmount > 0, "Value should not be zero");
@@ -358,7 +370,7 @@ contract VotePool is Params {
         voters[msg.sender].withdrawPendingAmount = 0;
         voters[msg.sender].withdrawExitBlock = 0;
 
-        msg.sender.transfer(_amount);
+        SafeEthTransfer.transferRevertOnError(msg.sender, _amount, MAX_GAS_USED);
         emit Withdraw(msg.sender, _amount);
     }
 }

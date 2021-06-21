@@ -296,30 +296,30 @@ contract Validators is Params {
     function improveRanking()
     external
     onlyRegistered {
-        IVotePool _validator = IVotePool(msg.sender);
-        require(_validator.state() == State.Ready, "Incorrect state");
+        IVotePool _pool = IVotePool(msg.sender);
+        require(_pool.state() == State.Ready, "Incorrect state");
 
-        SortedLinkedList.List storage _list = topVotePools[_validator.validatorType()];
-        _list.improveRanking(_validator);
+        SortedLinkedList.List storage _list = topVotePools[_pool.validatorType()];
+        _list.improveRanking(_pool);
     }
 
     function lowerRanking()
     external
     onlyRegistered {
-        IVotePool _validator = IVotePool(msg.sender);
-        require(_validator.state() == State.Ready, "Incorrect state");
+        IVotePool _pool = IVotePool(msg.sender);
+        require(_pool.state() == State.Ready, "Incorrect state");
 
-        SortedLinkedList.List storage _list = topVotePools[_validator.validatorType()];
-        _list.lowerRanking(_validator);
+        SortedLinkedList.List storage _list = topVotePools[_pool.validatorType()];
+        _list.lowerRanking(_pool);
     }
 
     function removeRanking()
     external
     onlyRegistered {
-        IVotePool _validator = IVotePool(msg.sender);
+        IVotePool _pool = IVotePool(msg.sender);
 
-        SortedLinkedList.List storage _list = topVotePools[_validator.validatorType()];
-        _list.removeRanking(_validator);
+        SortedLinkedList.List storage _list = topVotePools[_pool.validatorType()];
+        _list.removeRanking(_pool);
     }
 
 }

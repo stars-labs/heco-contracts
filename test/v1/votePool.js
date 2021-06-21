@@ -20,7 +20,7 @@ contract("VotePool test", accounts => {
     it("add pool", async () => {
         let tx = await validators.addValidator(accounts[0], accounts[0], 20, Pos, {
             from: accounts[0],
-            gas: 2000000
+            gas: 3000000
         })
         assert(tx.receipt.status)
 
