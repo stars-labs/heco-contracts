@@ -58,6 +58,11 @@ contract Params {
         _;
     }
 
+    modifier onlyValidAddress(address _address) {
+        require(_address != address(0), "Invalid address");
+        _;
+    }
+
     function setAddress(address _val, address _punish)
     external {
         validatorsContract = IValidators(_val);
