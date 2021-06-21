@@ -70,9 +70,9 @@ contract VotePool is Params {
     modifier onlyValidPercent(ValidatorType _type, uint _percent) {
         //zero represents null value, trade as invalid
         if (_type == ValidatorType.Poa) {
-            require(_percent > 0 && _percent <= PERCENT_BASE, "Invalid percent");
+            require(_percent <= PERCENT_BASE, "Invalid percent");
         } else {
-            require(_percent > 0 && _percent <= PERCENT_BASE.mul(3).div(10), "Invalid percent");
+            require(_percent <= PERCENT_BASE.mul(3).div(10), "Invalid percent");
         }
         _;
     }
@@ -179,7 +179,7 @@ contract VotePool is Params {
     external
     onlyValidatorsContract {
         if (pause) {
-            require(state == State.Idle || state == State.Ready, "Incorrect state");
+            require(state == State.Idle || (state == State.Jail && block.number.sub(punishBlk) > JailPeriod) || state == State.Ready, "Incorrect state");
 
             state = State.Pause;
             emit ChangeState(state);
@@ -227,13 +227,15 @@ contract VotePool is Params {
     function exit()
     external
     onlyManager {
-        require(state == State.Ready, "Incorrect state");
+        require(state == State.Ready || state == State.Idle || (state == State.Jail && block.number.sub(punishBlk) > JailPeriod), "Incorrect state");
         exitBlk = block.number;
 
-        state = State.Idle;
-        emit ChangeState(state);
+        if (state != State.Idle) {
+            state = State.Idle;
+            emit ChangeState(state);
 
-        validatorsContract.removeRanking();
+            validatorsContract.removeRanking();
+        }
         emit Exit(validator);
     }
 
