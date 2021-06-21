@@ -70,9 +70,9 @@ contract VotePool is Params {
     modifier onlyValidPercent(ValidatorType _type, uint _percent) {
         //zero represents null value, trade as invalid
         if (_type == ValidatorType.Poa) {
-            require(_percent > 0 && _percent <= PERCENT_BASE, "Invalid percent");
+            require(_percent <= PERCENT_BASE, "Invalid percent");
         } else {
-            require(_percent > 0 && _percent <= PERCENT_BASE.mul(3).div(10), "Invalid percent");
+            require(_percent <= PERCENT_BASE.mul(3).div(10), "Invalid percent");
         }
         _;
     }
