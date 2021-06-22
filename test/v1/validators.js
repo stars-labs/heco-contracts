@@ -54,7 +54,7 @@ contract("Validators test", accounts => {
         try {
             await validators.updateParams(1, 1, 1, 1, {from: accounts[0]})
         } catch (e) {
-            assert(e.message.search('Invalid validator counts') >= 0, 'invalid validator count')
+            assert(e.message.search('Invalid counts') >= 0, 'invalid count')
         }
 
         let tx = await validators.updateParams(20, 20, 1, 1, {from: accounts[0]})

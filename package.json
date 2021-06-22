@@ -15,6 +15,7 @@
     "@nomiclabs/hardhat-web3": "^2.0.0",
     "@openzeppelin/test-helpers": "^0.5.11",
     "hardhat": "^2.2.1",
+    "hardhat-contract-sizer": "^2.0.3",
     "mocha": "^8.4.0",
     "solpp": "^0.11.5",
     "truffle-assertions": "^0.9.2",
@@ -23,7 +24,8 @@
   "scripts": {
     "test": "NET=devnet yarn run hardhat test test/v1/*",
     "clean": "yarn run hardhat clean",
-    "compile": "NET=mainnet yarn run hardhat compile"
+    "compile": "NET=mainnet yarn run hardhat compile",
+    "size": "yarn run hardhat size-contracts"
   },
   "author": "",
   "license": "ISC"
