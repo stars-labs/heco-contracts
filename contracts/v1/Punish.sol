@@ -7,8 +7,9 @@ import "./mock/MockParams.sol";
 // #endif
 import "./interfaces/IVotePool.sol";
 import "./interfaces/IValidators.sol";
+import "./interfaces/IPunish.sol";
 
-contract Punish is Params {
+contract Punish is Params, IPunish {
     uint256 public punishThreshold;
     uint256 public removeThreshold;
     uint256 public decreaseRate;
@@ -103,8 +104,8 @@ contract Punish is Params {
     // clean validator's punish record if one vote in
     function cleanPunishRecord(address _val)
     external
+    override
     onlyInitialized
-    returns (bool)
     {
         require(address(validatorsContract.votePools(_val)) == msg.sender, "Validator not registered");
         if (punishRecords[_val].missedBlocksCounter != 0) {
@@ -123,8 +124,6 @@ contract Punish is Params {
             punishRecords[_val].index = 0;
             punishRecords[_val].exist = false;
         }
-
-        return true;
     }
 
     function getPunishValidatorsLen() public view returns (uint256) {

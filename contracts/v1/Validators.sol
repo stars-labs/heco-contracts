@@ -10,8 +10,10 @@ import "../library/SafeMath.sol";
 import "./VotePool.sol";
 import "./library/SortedList.sol";
 import "./interfaces/IVotePool.sol";
+import "./interfaces/IValidators.sol";
 
-contract Validators is Params {
+
+contract Validators is Params, IValidators {
     using SafeMath for uint;
     using SortedLinkedList for SortedLinkedList.List;
 
@@ -25,10 +27,10 @@ contract Validators is Params {
     mapping(address => uint8) actives;
 
     address[] public allValidators;
-    mapping(address => IVotePool) public votePools;
+    mapping(address => IVotePool) public override votePools;
 
     uint256 rewardLeft;
-    mapping(IVotePool => uint) public pendingReward;
+    mapping(IVotePool => uint) public override pendingReward;
 
     mapping(ValidatorType => SortedLinkedList.List) topVotePools;
 
@@ -73,7 +75,7 @@ contract Validators is Params {
             require(votePools[_validator] == IVotePool(0), "Validators already exists");
             VotePool _pool = new VotePool(_validator, _managers[i], PERCENT_BASE, ValidatorType.Poa, State.Ready);
             allValidators.push(_validator);
-            votePools[_validator] = IVotePool(address(_pool));
+            votePools[_validator] = _pool;
 
             // #if !Mainnet
             _pool.setAddress(address(this), address(0));
@@ -94,7 +96,7 @@ contract Validators is Params {
     function updateParams(uint8 _posCount, uint8 _posBackup, uint8 _poaCount, uint8 _poaBackup)
     external
     onlyAdmin {
-        require(_posCount + _poaCount == MaxValidators, "Invalid validator counts");
+        require(_posCount + _poaCount == MaxValidators, "Invalid counts");
         require(_posBackup <= _posCount && _poaBackup <= _poaCount, "Invalid backup counts");
 
         count[ValidatorType.Pos] = _posCount;
@@ -115,7 +117,7 @@ contract Validators is Params {
         VotePool _pool = new VotePool(_validator, _manager, _percent, _type, State.Idle);
 
         allValidators.push(_validator);
-        votePools[_validator] = IVotePool(address(_pool));
+        votePools[_validator] = _pool;
 
         emit AddValidator(_validator, address(_pool));
 
@@ -283,6 +285,7 @@ contract Validators is Params {
     }
 
     function withdrawReward()
+    override
     external {
         uint _amount = pendingReward[IVotePool(msg.sender)];
         if (_amount == 0) {
@@ -295,6 +298,7 @@ contract Validators is Params {
 
     function improveRanking()
     external
+    override
     onlyRegistered {
         IVotePool _pool = IVotePool(msg.sender);
         require(_pool.state() == State.Ready, "Incorrect state");
@@ -305,6 +309,7 @@ contract Validators is Params {
 
     function lowerRanking()
     external
+    override
     onlyRegistered {
         IVotePool _pool = IVotePool(msg.sender);
         require(_pool.state() == State.Ready, "Incorrect state");
@@ -315,6 +320,7 @@ contract Validators is Params {
 
     function removeRanking()
     external
+    override
     onlyRegistered {
         IVotePool _pool = IVotePool(msg.sender);
 

@@ -7,23 +7,21 @@ import "./Params.sol";
 import "./mock/MockParams.sol";
 // #endif
 import "../library/SafeMath.sol";
-import "./library/SafeEthTransfer.sol";
 import "./library/ReentrancyGuard.sol";
 import "./interfaces/IVotePool.sol";
 import "./interfaces/IValidators.sol";
 import "./interfaces/IPunish.sol";
 
-contract VotePool is Params, ReentrancyGuard {
+contract VotePool is Params, ReentrancyGuard, IVotePool {
     using SafeMath for uint;
 
     uint constant COEFFICIENT = 1e18;
-    uint constant MAX_GAS_USED = 50000;
 
-    ValidatorType public validatorType;
+    ValidatorType public override validatorType;
 
-    State public state;
+    State public override state;
 
-    address public validator;
+    address public override validator;
 
     address public manager;
 
@@ -42,7 +40,7 @@ contract VotePool is Params, ReentrancyGuard {
     //use to calc voter's reward
     uint accRewardPerShare;
 
-    uint public totalVote;
+    uint public override totalVote;
 
     uint public punishBlk;
 
@@ -152,11 +150,17 @@ contract VotePool is Params, ReentrancyGuard {
         emit ConfirmPercentChange(percent);
     }
 
+    function isIdleStateLike()
+    internal
+    view returns (bool) {
+        return state == State.Idle || (state == State.Jail && block.number.sub(punishBlk) > JailPeriod);
+    }
+
     function addMargin()
     external
     payable
     onlyManager {
-        require(state == State.Idle || (state == State.Jail && block.number.sub(punishBlk) > JailPeriod), "Incorrect state");
+        require(isIdleStateLike(), "Incorrect state");
         require(exitBlk == 0 || block.number.sub(exitBlk) > MarginLockPeriod, "Interval not long enough");
         require(msg.value > 0, "Value should not be zero");
 
@@ -180,9 +184,10 @@ contract VotePool is Params, ReentrancyGuard {
 
     function switchState(bool pause)
     external
+    override
     onlyValidatorsContract {
         if (pause) {
-            require(state == State.Idle || (state == State.Jail && block.number.sub(punishBlk) > JailPeriod) || state == State.Ready, "Incorrect state");
+            require(isIdleStateLike() || state == State.Ready, "Incorrect state");
 
             state = State.Pause;
             emit ChangeState(state);
@@ -199,6 +204,7 @@ contract VotePool is Params, ReentrancyGuard {
 
     function punish()
     external
+    override
     onlyPunishContract {
         punishBlk = block.number;
 
@@ -211,10 +217,8 @@ contract VotePool is Params, ReentrancyGuard {
         uint _punishAmount = margin >= PunishAmount ? PunishAmount : margin;
         if (_punishAmount > 0) {
             margin = margin.sub(_punishAmount);
-            bool _success = SafeEthTransfer.transferReturnResult(address(0), _punishAmount, MAX_GAS_USED);
-            if (_success) {
-                emit Punish(validator, _punishAmount);
-            }
+            sendValue(address(0), _punishAmount);
+            emit Punish(validator, _punishAmount);
         }
 
         return;
@@ -222,11 +226,12 @@ contract VotePool is Params, ReentrancyGuard {
 
     function removeValidatorIncoming()
     external
+    override
     onlyPunishContract {
         uint _incoming = validatorReward;
         validatorReward = 0;
-        bool _success = SafeEthTransfer.transferReturnResult(address(0), _incoming, MAX_GAS_USED);
-        if (_success) {
+        if (_incoming > 0) {
+            sendValue(address(0), _incoming);
             emit RemoveIncoming(validator, _incoming);
         }
     }
@@ -234,7 +239,7 @@ contract VotePool is Params, ReentrancyGuard {
     function exit()
     external
     onlyManager {
-        require(state == State.Ready || state == State.Idle || (state == State.Jail && block.number.sub(punishBlk) > JailPeriod), "Incorrect state");
+        require(state == State.Ready || isIdleStateLike(), "Incorrect state");
         exitBlk = block.number;
 
         if (state != State.Idle) {
@@ -250,13 +255,13 @@ contract VotePool is Params, ReentrancyGuard {
     external
     nonReentrant
     onlyManager {
-        require(state == State.Idle || (state == State.Jail && block.number.sub(punishBlk) > JailPeriod), "Incorrect state");
+        require(isIdleStateLike(), "Incorrect state");
         require(block.number.sub(exitBlk) > MarginLockPeriod, "Interval not long enough");
         require(margin > 0, "No more margin");
 
         uint _amount = margin;
         margin = 0;
-        SafeEthTransfer.transferRevertOnError(msg.sender, _amount, MAX_GAS_USED);
+        sendValue(msg.sender, _amount);
         emit WithdrawMargin(msg.sender, _amount);
     }
 
@@ -282,7 +287,7 @@ contract VotePool is Params, ReentrancyGuard {
 
         uint _amount = validatorReward;
         validatorReward = 0;
-        SafeEthTransfer.transferRevertOnError(msg.sender, _amount, MAX_GAS_USED);
+        sendValue(msg.sender, _amount);
         emit WithdrawValidatorReward(msg.sender, _amount);
     }
 
@@ -327,7 +332,7 @@ contract VotePool is Params, ReentrancyGuard {
         }
 
         if (_pendingReward > 0) {
-            SafeEthTransfer.transferRevertOnError(msg.sender, _pendingReward, MAX_GAS_USED);
+            sendValue(msg.sender, _pendingReward);
             emit WithdrawVoteReward(msg.sender, _pendingReward);
         }
     }
@@ -354,7 +359,7 @@ contract VotePool is Params, ReentrancyGuard {
         voters[msg.sender].withdrawPendingAmount = voters[msg.sender].withdrawPendingAmount.add(_amount);
         voters[msg.sender].withdrawExitBlock = block.number;
 
-        SafeEthTransfer.transferRevertOnError(msg.sender, _pendingReward, MAX_GAS_USED);
+        sendValue(msg.sender, _pendingReward);
 
         emit ExitVote(msg.sender, _amount);
         emit WithdrawVoteReward(msg.sender, _pendingReward);
@@ -370,7 +375,31 @@ contract VotePool is Params, ReentrancyGuard {
         voters[msg.sender].withdrawPendingAmount = 0;
         voters[msg.sender].withdrawExitBlock = 0;
 
-        SafeEthTransfer.transferRevertOnError(msg.sender, _amount, MAX_GAS_USED);
+        sendValue(msg.sender, _amount);
         emit Withdraw(msg.sender, _amount);
+    }
+
+    /**
+      * @dev Replacement for Solidity's `transfer`: sends `amount` wei to
+      * `recipient`, forwarding all available gas and reverting on errors.
+      *
+      * https://eips.ethereum.org/EIPS/eip-1884[EIP1884] increases the gas cost
+      * of certain opcodes, possibly making contracts go over the 2300 gas limit
+      * imposed by `transfer`, making them unable to receive funds via
+      * `transfer`. {sendValue} removes this limitation.
+      *
+      * https://diligence.consensys.net/posts/2019/09/stop-using-soliditys-transfer-now/[Learn more].
+      *
+      * IMPORTANT: because control is transferred to `recipient`, care must be
+      * taken to not create reentrancy vulnerabilities. Consider using
+      * {ReentrancyGuard} or the
+      * https://solidity.readthedocs.io/en/v0.5.11/security-considerations.html#use-the-checks-effects-interactions-pattern[checks-effects-interactions pattern].
+      */
+    function sendValue(address payable recipient, uint256 amount) internal {
+        require(address(this).balance >= amount, "Address: insufficient balance");
+
+        // solhint-disable-next-line avoid-low-level-calls, avoid-call-value
+        (bool success,) = recipient.call{value : amount}("");
+        require(success, "Address: unable to send value, recipient may have reverted");
     }
 }

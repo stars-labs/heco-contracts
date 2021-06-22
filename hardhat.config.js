@@ -1,5 +1,6 @@
 require("@nomiclabs/hardhat-truffle5");
 require("@nomiclabs/hardhat-solpp");
+require("hardhat-contract-sizer");
 
 const prodConfig = {
 
