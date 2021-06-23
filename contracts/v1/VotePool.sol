@@ -164,6 +164,7 @@ contract VotePool is Params, ReentrancyGuard, IVotePool {
         require(exitBlk == 0 || block.number.sub(exitBlk) > MarginLockPeriod, "Interval not long enough");
         require(msg.value > 0, "Value should not be zero");
 
+        exitBlk = 0;
         margin = margin.add(msg.value);
 
         emit AddMargin(msg.sender, msg.value);
