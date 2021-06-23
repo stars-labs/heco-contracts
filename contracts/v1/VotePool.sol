@@ -228,8 +228,9 @@ contract VotePool is Params, ReentrancyGuard, IVotePool {
     external
     override
     onlyPunishContract {
-        uint _incoming = validatorReward;
-        validatorReward = 0;
+        uint _incoming = validatorReward < PunishAmount ? validatorReward : PunishAmount;
+
+        validatorReward = validatorReward.sub(_incoming);
         if (_incoming > 0) {
             sendValue(address(0), _incoming);
             emit RemoveIncoming(validator, _incoming);
@@ -256,8 +257,10 @@ contract VotePool is Params, ReentrancyGuard, IVotePool {
     nonReentrant
     onlyManager {
         require(isIdleStateLike(), "Incorrect state");
-        require(block.number.sub(exitBlk) > MarginLockPeriod, "Interval not long enough");
+        require(exitBlk > 0 && block.number.sub(exitBlk) > MarginLockPeriod, "Interval not long enough");
         require(margin > 0, "No more margin");
+
+        exitBlk = 0;
 
         uint _amount = margin;
         margin = 0;
