@@ -229,6 +229,8 @@ contract VotePool is Params, ReentrancyGuard, IVotePool {
     external
     override
     onlyPunishContract {
+        validatorsContract.withdrawReward();
+
         uint _incoming = validatorReward < PunishAmount ? validatorReward : PunishAmount;
 
         validatorReward = validatorReward.sub(_incoming);
