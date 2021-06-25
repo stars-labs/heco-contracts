@@ -179,6 +179,8 @@ contract VotePool is Params, ReentrancyGuard, IVotePool {
         if (margin >= minMargin) {
             state = State.Ready;
             punishContract.cleanPunishRecord(validator);
+            validatorsContract.improveRanking();
+
             emit ChangeState(state);
         }
     }
