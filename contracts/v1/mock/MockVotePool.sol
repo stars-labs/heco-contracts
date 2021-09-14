@@ -10,34 +10,41 @@ import "../../library/SafeMath.sol";
 import "../interfaces/IVotePool.sol";
 import "../interfaces/IValidators.sol";
 
-contract MockVotePool is Params {
+contract VotePool is Params, IVotePool {
     using SafeMath for uint;
 
     IValidators pool;
 
-    ValidatorType public validatorType;
+    ValidatorType public override validatorType;
 
-    State public state;
+    State public override state;
 
     uint public percent;
 
-    address public validator;
+    address public override validator;
 
     address public manager;
 
-    uint public totalVote;
+    uint public override totalVote;
 
-    constructor(address _miner, address _manager, uint8 _percent, ValidatorType _type)
+    constructor(address _miner, address _manager, uint _percent, ValidatorType _type, State _state)
     public {
         pool = IValidators(msg.sender);
         validator = _miner;
         manager = _manager;
         percent = _percent;
         validatorType = _type;
-        state = State.Ready;
+        state = _state;
+    }
+
+    function initialize()
+    external {
+        initialized = true;
+        validatorsContract.improveRanking();
     }
 
     function switchState(bool pause)
+    override
     external {
     }
 
@@ -56,17 +63,37 @@ contract MockVotePool is Params {
         totalVote = _vote;
     }
 
-    function changeVoteAndRanking(IValidators _pool, uint _vote) external {
-        totalVote = _vote;
+    function changeVoteAndRanking(IValidators validators, uint _vote) external {
 
         if (_vote > totalVote) {
-            _pool.improveRanking();
+            totalVote = _vote;
+            validators.improveRanking();
         } else {
-            _pool.lowerRanking();
+            totalVote = _vote;
+            validators.lowerRanking();
         }
     }
 
     function changeState(State _state) external {
         state = _state;
     }
+
+
+    function punish()
+    external
+    override {
+
+    }
+
+    function removeValidatorIncoming()
+    external
+    override {
+
+    }
+
+    function receiveReward()
+    external
+    payable {
+    }
+
 }

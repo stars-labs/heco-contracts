@@ -7,13 +7,17 @@ import "./Params.sol";
 import "./mock/MockParams.sol";
 // #endif
 import "../library/SafeMath.sol";
+// #if Mainnet
 import "./VotePool.sol";
+// #else
+import "./mock/MockVotePool.sol";
+// #endif
 import "./library/SortedList.sol";
 import "./interfaces/IVotePool.sol";
 import "./interfaces/IValidators.sol";
+import "./library/SafeSend.sol";
 
-
-contract Validators is Params, IValidators {
+contract Validators is Params, SafeSend, IValidators {
     using SafeMath for uint;
     using SortedLinkedList for SortedLinkedList.List;
 
@@ -36,12 +40,26 @@ contract Validators is Params, IValidators {
 
     mapping(uint256 => mapping(Operation => bool)) operationsDone;
 
+    address payable constant burnReceiver = 0x000000000000000000000000000000000000FaaA;
+    address payable public foundation;
+    uint public foundationReward;
+    uint public burnRate;
+    uint public foundationRate;
+
     event ChangeAdmin(address indexed admin);
     event UpdateParams(uint8 posCount, uint8 posBackup, uint8 poaCount, uint8 poaBackup);
     event AddValidator(address indexed validator, address votePool);
+    event UpdateRates(uint burnRate, uint foundationRate);
+    event UpdateFoundationAddress(address foundation);
+    event WithdrawFoundationReward(address receiver, uint amount);
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Only admin");
+        _;
+    }
+
+    modifier onlyFoundation() {
+        require(msg.sender == foundation, "Only foundation");
         _;
     }
 
@@ -106,6 +124,33 @@ contract Validators is Params, IValidators {
         backupCount[ValidatorType.Poa] = _poaBackup;
 
         emit UpdateParams(_posCount, _posBackup, _poaCount, _poaBackup);
+    }
+
+    function updateRates(uint _burnRate, uint _foundationRate)
+    external
+    onlyAdmin {
+        require(_burnRate.add(_foundationRate) <= PERCENT_BASE, "Invalid rates");
+
+        burnRate = _burnRate;
+        foundationRate = _foundationRate;
+
+        emit UpdateRates(_burnRate, _foundationRate);
+    }
+
+    function updateFoundation(address payable _foundation)
+    external
+    onlyAdmin {
+        foundation = _foundation;
+        emit UpdateFoundationAddress(_foundation);
+    }
+
+    function withdrawFoundationReward()
+    external
+    onlyFoundation {
+        uint _val = foundationReward;
+        foundationReward = 0;
+        sendValue(msg.sender, _val);
+        emit WithdrawFoundationReward(msg.sender, _val);
     }
 
     function addValidator(address _validator, address _manager, uint _percent, ValidatorType _type)
@@ -239,9 +284,15 @@ contract Validators is Params, IValidators {
     {
         operationsDone[block.number][Operation.Distribute] = true;
 
-        uint _left = msg.value.add(rewardLeft);
+        uint burnVal = msg.value.mul(burnRate).div(PERCENT_BASE);
+        sendValue(burnReceiver, burnVal);
 
-        // 10% to backups 40% validators share by vote 50% validators share
+        uint foundationVal = msg.value.mul(foundationRate).div(PERCENT_BASE);
+        foundationReward = foundationReward.add(foundationVal);
+
+        uint _left = msg.value.add(rewardLeft).sub(burnVal).sub(foundationVal);
+
+        // 10% to backups; 40% to validators according to votes; 50% is divided equally among validators
         uint _firstPart = _left.mul(10).div(100);
         uint _secondPartTotal = _left.mul(40).div(100);
         uint _thirdPart = _left.mul(50).div(100);

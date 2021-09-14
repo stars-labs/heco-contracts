@@ -1,9 +1,9 @@
 const Validators = artifacts.require('cache/solpp-generated-contracts/v1/mock/MockValidators.sol:MockValidators');
 const Punish = artifacts.require('MockPunish');
-const VotePool = artifacts.require('VotePool');
+const VotePool = artifacts.require('cache/solpp-generated-contracts/v1/VotePool.sol:VotePool');
 
 const {web3, BN} = require('@openzeppelin/test-helpers/src/setup');
-const truffleAssert = require('truffle-assertions')
+const {expectEvent, expectRevert, ether, balance} = require("@openzeppelin/test-helpers");
 
 const Pos = 0
 const Poa = 1
@@ -11,6 +11,8 @@ const Poa = 1
 contract("VotePool test", accounts => {
     let validators;
     let punish;
+    let validator;
+    let manager;
 
     before('deploy', async () => {
         validators = await Validators.new()
@@ -24,7 +26,10 @@ contract("VotePool test", accounts => {
         })
         assert(tx.receipt.status)
 
-        let pool = await VotePool.at(await validators.votePools(accounts[0]))
+        validator = accounts[0]
+        manager = accounts[0]
+
+        let pool = await VotePool.at(await validators.votePools(validator))
         await pool.setAddress(validators.address, punish.address)
 
         assert.equal(await pool.state(), 0)
@@ -49,47 +54,60 @@ contract("VotePool test", accounts => {
 
 
     it("change manager", async () => {
-        let pool = await VotePool.at(await validators.votePools(accounts[0]))
+        let pool = await VotePool.at(await validators.votePools(validator))
 
-        let tx = await pool.changeManager(accounts[1], {from: accounts[0]})
-        truffleAssert.eventEmitted(tx, "ChangeManager", {manager: accounts[1]})
+        let tx = await pool.changeManager(accounts[1], {from: validator})
+        await expectEvent(tx, "ChangeManager", {manager: accounts[1]})
+        manager = accounts[1]
     })
 
     it("add margin", async () => {
-        let pool = await VotePool.at(await validators.votePools(accounts[0]))
+        let pool = await VotePool.at(await validators.votePools(validator))
         let tx = await pool.addMargin({
-            from: accounts[1],
-            value: web3.utils.toWei("1", "ether")
+            from: manager,
+            value: ether("1")
         })
 
-        truffleAssert.eventEmitted(tx, 'AddMargin', ev => ev.sender === accounts[1]
-            && ev.amount == web3.utils.toWei("1", "ether").toString())
+        await expectEvent(tx, 'AddMargin', {
+            sender: manager,
+            amount: ether('1')
+        })
 
         assert.equal(await pool.state(), 0)
 
         tx = await pool.addMargin({
-            from: accounts[1],
-            value: web3.utils.toWei("4", "ether")
+            from: manager,
+            value: ether("4")
         })
-        truffleAssert.eventEmitted(tx, 'AddMargin', ev => ev.sender === accounts[1]
-            && ev.amount == web3.utils.toWei("4", "ether").toString())
-
-        truffleAssert.eventEmitted(tx, 'ChangeState', ev => ev.state == 1)
+        await expectEvent(tx, 'AddMargin', {
+            sender: accounts[1],
+            amount: ether('4')
+        })
+        await expectEvent(tx, 'ChangeState', {
+            state: '1'
+        })
 
         assert.equal(await pool.state(), 1)
     })
 
     it("change percent", async () => {
-        let pool = await VotePool.at(await validators.votePools(accounts[0]))
-        let tx = await pool.submitPercentChange(80, {from: accounts[1]})
-        truffleAssert.eventEmitted(tx, 'SubmitPercentChange', ev => ev.percent.toString() == 80)
+        let pool = await VotePool.at(await validators.votePools(validator))
+        let tx = await pool.submitPercentChange(80, {from: manager})
 
-        tx = await pool.confirmPercentChange({from: accounts[1]})
-        truffleAssert.eventEmitted(tx, 'ConfirmPercentChange', ev => ev.percent.toString() == 80)
+        await expectEvent(tx, 'SubmitPercentChange', {
+            percent: '80'
+        })
+
+        tx = await pool.confirmPercentChange({from: manager})
+
+        await expectEvent(tx, 'ConfirmPercentChange', {
+            percent: '80'
+        })
+
         assert.equal(await pool.percent(), 80)
 
         try {
-            await pool.confirmPercentChange({from: accounts[1]})
+            await pool.confirmPercentChange({from: manager})
         } catch (e) {
             assert(e, 'invalid confirm percent change')
             // assert(e.message.search('Invalid percent') >= 0, 'invalid confirm percent change')
@@ -97,33 +115,18 @@ contract("VotePool test", accounts => {
     })
 
     it("change percent", async () => {
-        let pool = await VotePool.at(await validators.votePools(accounts[0]))
-        try {
-            await pool.submitPercentChange(0, {from: accounts[0]});
-        } catch (e) {
-            assert(e.message, 'from invalid account')
-            // assert(e.message.search('Only manager allowed') >= 0, 'from invalid account')
-        }
+        let pool = await VotePool.at(await validators.votePools(validator))
 
-        try {
-            await pool.submitPercentChange(0, {from: accounts[1]});
-        } catch (e) {
-            assert(e.message, 'change percent to 0')
-            // assert(e.message.search('Invalid percent') >= 0, 'change percent to 0')
-        }
+        await expectRevert(pool.submitPercentChange(0, {from: accounts[0]}), 'Only manager allowed')
 
-        try {
-            await pool.submitPercentChange(1001, {from: accounts[1]});
-        } catch (e) {
-            assert(e.message, 'change percent to 1001')
-            // assert(e.message.search('Invalid percent') >= 0, 'change percent to 1001')
-        }
+        await expectRevert(pool.submitPercentChange(3001, {from: manager}), 'Invalid percent')
 
-        let tx = await pool.submitPercentChange(1, {from: accounts[1]});
-        assert.equal(tx.receipt.status, true, 'change percent to 1')
 
-        await pool.confirmPercentChange({from: accounts[1]});
-        assert.equal(await pool.percent(), 1, "change percent success")
+        let tx = await pool.submitPercentChange(1, {from: manager});
+        await expectEvent(tx, 'SubmitPercentChange', {percent: '1'})
+
+        tx = await pool.confirmPercentChange({from: manager});
+        await expectEvent(tx, 'ConfirmPercentChange', {percent: '1'})
     })
 
 
@@ -131,28 +134,31 @@ contract("VotePool test", accounts => {
         let pool = await VotePool.at(await validators.votePools(accounts[0]))
 
         params = [
-            [1, 100],
-            [2, 200],
-            [3, 0.00001]
+            [1, '100'],
+            [2, '200'],
+            [3, '0.00001']
         ]
 
         let tops = [await pool.validator()]
         for (let p of params) {
-            let tx = await pool.deposit({from: accounts[p[0]], value: web3.utils.toWei(p[1] + "", "ether")})
-            truffleAssert.eventEmitted(tx, "Deposit", ev => ev.amount == web3.utils.toWei(p[1] + "", "ether").toString())
+            let tx = await pool.deposit({from: accounts[p[0]], value: ether(p[1] )})
+
+            await expectEvent(tx, "Deposit", {
+                amount: ether(p[1])
+            })
         }
 
         await validators.updateActiveValidatorSet(tops)
     })
 
     it("reward", async () => {
-        await validators.distributeBlockReward({from: accounts[0], gas: 400000, value: web3.utils.toWei("1", "ether")})
-        assert.equal(web3.utils.toWei("1", "ether"), await web3.eth.getBalance(validators.address))
-        assert.equal(web3.utils.toWei("1", "ether"), await validators.pendingReward(await validators.votePools(accounts[0])))
+        await validators.distributeBlockReward({from: accounts[0], gas: 400000, value: ether("1")})
+        assert.equal(ether("1").toString(), (await balance.current(validators.address)).toString())
+        assert.equal(ether("1").toString(), (await validators.pendingReward(await validators.votePools(validator))).toString())
     })
 
     it('switch state', async () => {
-        let pool = await VotePool.at(await validators.votePools(accounts[0]))
+        let pool = await VotePool.at(await validators.votePools(validator))
         assert.equal(await pool.state(), 1, 'in ready state')
         await pool.switchState(true)
         assert.equal(await pool.state(), 2, 'in pause state')
@@ -161,44 +167,45 @@ contract("VotePool test", accounts => {
     })
 
     it('punish', async () => {
-        let pool = await VotePool.at(await validators.votePools(accounts[0]))
-        let balanceBefore = await web3.eth.getBalance(pool.address);
+        let pool = await VotePool.at(await validators.votePools(validator))
+        let balanceBefore = await balance.current(pool.address);
         let marginBefore = await pool.margin();
 
         let punishAmount = await pool.PunishAmount()
         await pool.punish()
 
-        assert.equal(balanceBefore - await web3.eth.getBalance(pool.address), punishAmount.toString(), 'contract balance check')
+        assert.equal(balanceBefore - await balance.current(pool.address), punishAmount.toString(), 'contract balance check')
         assert.equal(marginBefore - await pool.margin(), punishAmount.toString(), 'contract margin check')
     })
 
     it("exit", async () => {
-        let pool = await VotePool.at(await validators.votePools(accounts[0]))
+        let pool = await VotePool.at(await validators.votePools(validator))
         try {
-            await pool.exit({from: accounts[1]})
+            await pool.exit({from: manager})
         } catch (e) {
             assert(e, 'Incorrect state')
             // assert(e.message.search('Incorrect state') >= 0, 'Incorrect state')
         }
 
         await pool.addMargin({
-            from: accounts[1],
-            value: web3.utils.toWei("5", "ether")
+            from: manager,
+            value: ether("5")
         })
 
         assert.equal(await pool.state(), 1, 'Ready state')
-        await pool.exit({from: accounts[1]})
+        await pool.exit({from: manager})
         assert.equal(await pool.state(), 0, 'Idle state')
     })
 
     it("withdraw margin", async () => {
-        let pool = await VotePool.at(await validators.votePools(accounts[0]))
+        let pool = await VotePool.at(await validators.votePools(validator))
         let margin = await pool.margin()
 
-        let balanceBefore = await web3.eth.getBalance(accounts[1])
-        let tx = await pool.withdrawMargin({from: accounts[1]})
+        let balanceBefore = await balance.current(accounts[1])
+        let tx = await pool.withdrawMargin({from: manager})
+
         let fee = web3.utils.toBN((await web3.eth.getTransaction(tx.tx)).gasPrice).mul(web3.utils.toBN(tx.receipt.gasUsed))
 
-        assert.equal(web3.utils.toBN(await web3.eth.getBalance(accounts[1])).sub(web3.utils.toBN(balanceBefore)).add(web3.utils.toBN(fee)).toString(), margin.toString())
+        assert.equal(web3.utils.toBN(await balance.current(accounts[1])).sub(web3.utils.toBN(balanceBefore)).add(web3.utils.toBN(fee)).toString(), margin.toString())
     })
 })

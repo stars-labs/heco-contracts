@@ -31,6 +31,7 @@ module.exports = {
     },
     networks: {
         hardhat: {
+            allowUnlimitedContractSize: true,
             accounts: {
                 mnemonic: "test test test test test test test test test test test junk",
                 count: 20
