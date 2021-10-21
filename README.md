@@ -1,4 +1,4 @@
-# huobi-eco-contracts
+# heco-contracts
 
 ## Prepare
 
